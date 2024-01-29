@@ -332,10 +332,17 @@ int voltage_loop(void){
 	HAL_Delay(10); // Still have to wait for conversions
 
 	// Might to shift to reading normal cell voltage. Daisy chains kinda lame fr fr
-	spiReadData(14, RDFCALL, rx_data, pec_err, cmd_count_list);
+	spiReadData(TOTAL_IC, RDFCALL, rx_data, pec_err, cmd_count_list);
+
+	// TODO: PARSE CELL VOLTAGE HERE
 
 	spiSendCmd(AUX2_Start);
 	HAL_Delay(100); // Maybe it's better to poll this one.
+	spiReadData(TOTAL_IC, PLAUX2, rx_data, pec_err, cmd_count_list);
+
+
+	// TODO: PARSE CELL TEMPERATURE HERE
+
 
 	return 0;
 }
