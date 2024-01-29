@@ -24,6 +24,7 @@ and its licensor.
 
 //#include "common.h"
 
+// F**k these things. I will move all these to defines because I think it is ugly asf
 /* configuration registers commands */
 uint8_t WRCFGA[2]        = { 0x00, 0x01 };
 uint8_t WRCFGB[2]        = { 0x00, 0x24 };

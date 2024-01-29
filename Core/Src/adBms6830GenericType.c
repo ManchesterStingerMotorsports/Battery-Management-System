@@ -185,7 +185,7 @@ void spiReadData
 uint8_t tIC, 
 uint8_t tx_cmd[2], 
 uint8_t *rx_data,
-uint8_t *pec_error,
+uint32_t *pec_error,
 uint8_t *cmd_cntr,
 uint8_t regData_size
 )
@@ -197,14 +197,15 @@ uint8_t regData_size
   
   data = (uint8_t *)calloc(RX_BUFFER, sizeof(uint8_t));
   copyArray = (uint8_t *)calloc(BYTES_IN_REG, sizeof(uint8_t));
-  if((data == NULL) || (copyArray == NULL))
+  if((data == NULL) || (copyArray == NULL)) // I think this means no data was allocated
   {
    #ifdef MBED     
     pc.printf(" Failed to allocate spi read data memory \n");
     #else
     printf(" Failed to allocate spi read data memory \n");
     #endif	  
-    exit(0);
+//    exit(0); // THIS HALTS THE PROGRAM // Who wrote this wth
+    return;
   }
   else
   {
@@ -233,8 +234,8 @@ uint8_t regData_size
       /* Calculate data pec */
       calculated_pec = (uint16_t)pec10_calc(true, (BYTES_IN_REG-2), &copyArray[0]);
       /* Match received pec with calculated pec */
-      if (received_pec == calculated_pec){ pec_error[current_ic] = 0; }/* If no error is there value set to 0 */
-      else{ pec_error[current_ic] = 1; }                               /* If error is there value set to 1 */                         
+      if (received_pec == calculated_pec){ *pec_error &= ~(1<<current_ic); }/* If no error is there value set to 0 */
+      else{ *pec_error |= 1<<current_ic; }                               /* If error is there value set to 1 */  // Doing this bitwise because that makes more sense
     }
   }
   free(data);

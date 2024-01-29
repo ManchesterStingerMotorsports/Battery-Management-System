@@ -8,3 +8,8 @@ Hardware:
  - ADBMS6822
  
  # NOT EVEN CLOSE TO COMPLETE
+ 
+ TODO:
+ - ADBMS6830 tests
+ - ADBMS2950 init and monitoring
+ - CAN Communication 

@@ -36,7 +36,7 @@ void spiReadData
 uint8_t tIC, 
 uint8_t tx_cmd[2], 
 uint8_t *rx_data,
-uint8_t *pec_error,
+uint32_t *pec_error,
 uint8_t *cmd_cntr,
 uint8_t regData_size
 );

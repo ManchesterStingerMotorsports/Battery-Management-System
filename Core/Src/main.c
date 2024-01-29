@@ -32,7 +32,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define TOTAL_IC				14
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -58,7 +58,8 @@ static void MX_CAN1_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
-int bms_loop(void);
+int current_loop(void);
+int voltage_loop(void);
 int adbms_config_at_init(void);
 
 /* USER CODE END PFP */
@@ -305,7 +306,12 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-int bms_loop(void){
+int current_loop(void){
+	return 0;
+}
+
+
+int voltage_loop(void){
 	/*
 	 * Tasks:
 	 * 1. Measure cell voltages
@@ -313,6 +319,25 @@ int bms_loop(void){
 	 * 3. Measure battery pack current
 	 * 4. Write data to can?
 	 */
+	uint8_t AUX2_Start = {0x04, 0x00}; // And this why I don't like how they have written the libraries
+
+	uint32_t pec_err = 0; // To measure transmission error
+	uint8_t cmd_count_list[TOTAL_IC];
+	uint8_t rx_data[TOTAL_IC*6];
+
+	spiSendCmd(RDFCALL);
+
+	// Send 2950 command
+	HAL_Delay(1); // Simulating the sending
+	HAL_Delay(10); // Still have to wait for conversions
+
+	// Might to shift to reading normal cell voltage. Daisy chains kinda lame fr fr
+	spiReadData(14, RDFCALL, rx_data, pec_err, cmd_count_list);
+
+	spiSendCmd(AUX2_Start);
+	HAL_Delay(100); // Maybe it's better to poll this one.
+
+	return 0;
 }
 
 /*
@@ -328,7 +353,7 @@ int adbms_config_at_init(){
 	uint8_t buff_6830_b[6];
 	uint8_t buff_2950_a[6];
 	uint8_t buff_2950_b[6];
-	uint8_t buff_data[7*6];
+	uint8_t buff_data[TOTAL_IC*6];
 	// Init CONFIG REGISTER A constants. All magic numbers, but we will add the meaning in readme or docs
 	buff_6830_a[0] = 0x80; // Reference powered on
 	buff_6830_a[1] = 0x00; // All flags = 0
@@ -356,16 +381,19 @@ int adbms_config_at_init(){
 
 	// Put the reg data into the buffer that will be sent
 	for(int x ; x < 6; x ++){
-		memcpy(buff_data+(x*12), buff_6830_a, 6);
-		memcpy(buff_data+(x*12 + 6), buff_2950_a, 6);
+
+		if(x == 5) buff_6830_a[5] |= 0b1<<3; // COMM_BK flag set for the last chain
+
+		memcpy(buff_data+(x*12  + 6), buff_6830_a, 6); // Index for 6830 for the segment.
+		memcpy(buff_data+(x*12), buff_2950_a, 6); // Index for 2950 for the segment.
 	}
 
 	// Final data buffer will have 14*6 bytes for each config register
-	spiWriteData(14, WRCFGA, buff_data);
+	spiWriteData(14, WRCFGA, buff_data); // Note this function reverses the data buffer while sending.
 
 	for(int x ; x < 6; x ++){
-		memcpy(buff_data+(x*12), buff_6830_b, 6);
-		memcpy(buff_data+(x*12 + 6), buff_2950_b, 6);
+		memcpy(buff_data+(x*12), buff_6830_b, 6); // Index for 6830 for the segment.
+		memcpy(buff_data+(x*12 + 6), buff_2950_b, 6); // Index for 2950 for the segment.
 	}
 
 	// Final data buffer will have 14*6 bytes for each config register
@@ -379,6 +407,8 @@ int adbms_config_at_init(){
 extern int __io_putchar(int ch){
 	/*
 	 * Have to use this to implement printf, or even printnf
+	 * Easiest solution => Use UART.
+	 * Problem => UART slow + Takes up pins. But lets see
 	 */
 
 }
