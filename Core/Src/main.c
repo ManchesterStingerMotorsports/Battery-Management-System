@@ -307,17 +307,24 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 int current_loop(void){
+	/*
+	 * Current measurement from 2950
+	 */
 	return 0;
 }
 
+int can_loop(void){
+	/*
+	 * Handle comm with aux computer
+	 */
+	return 0;
+}
 
 int voltage_loop(void){
 	/*
 	 * Tasks:
 	 * 1. Measure cell voltages
 	 * 2. Measure cell temperatures
-	 * 3. Measure battery pack current
-	 * 4. Write data to can?
 	 */
 	uint8_t AUX2_Start = {0x04, 0x00}; // And this why I don't like how they have written the libraries
 
