@@ -23,7 +23,9 @@ and its licensor.
 #ifndef __ADBMSDATA_H
 #define __ADBMSDATA_H
 
-#include "common.h"
+#include <stdio.h>
+#include <stdint.h>
+#include <stdbool.h>
 
 #define CELL 16                 /* Bms ic number of cell              */
 #define AUX  12                 /* Bms ic number of Aux               */

@@ -7,6 +7,7 @@
 
 #ifndef SRC_MCU_WRAPPER_H_
 #define SRC_MCU_WRAPPER_H_
+#include <stdint.h>
 
 #define u16 				uint16_t
 #define u8 					uint8_t
@@ -14,25 +15,17 @@
 #define f64 				double
 
 
-
-enum spi_num {
-	ONE= 0,
-	TWO= 1,
-	THREE,
-	FOUR,
-	FIVE,
-	SIX,
-	SEVEN
-};
+#define FORIN(x,y)         for(int x = 0; x< y; x++) //This is a lazy define that I like
 
 
-int spi_write(u8 * tx_data, u16 size, enum spi_num SegNo);
 
-int spi_read(u8 * rx_data, u16 size, enum spi_num SegNo);
+int spi_write(u8 * tx_data, u16 size);
 
-int spi_read_write(u8 * tx_data, u8 * rx_data, u16 len , enum spi_num SegNo);
+int spi_read(u8 * rx_data, u16 size);
 
-void wakeup_seg(enum spi_num SegNo);
+int spi_read_write(u8 * tx_data, u8 * rx_data, u16 len);
+
+void wakeup_chain(u8);
 
 
 #endif /* SRC_MCU_WRAPPER_H_ */

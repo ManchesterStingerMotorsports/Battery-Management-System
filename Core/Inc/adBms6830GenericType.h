@@ -21,7 +21,14 @@ and its licensor.
 #ifndef __adBmsGenericType_H
 #define __adBmsGenericType_H
 
-#include "adbms_main.h"
+#include <stdint.h>
+#include <string.h>
+#include <stdbool.h>
+#include <stdlib.h>
+#include <stdio.h>
+
+#define TX_DATA 		6
+#define RX_DATA 		8
 
 /* Calculates and returns the CRC15Table */
 uint16_t Pec15_Calc
@@ -46,6 +53,8 @@ void spiWriteData
   uint8_t tx_cmd[2], 
   uint8_t *data
 );
+
+/*
 void adBmsReadData(uint8_t tIC, cell_asic *ic, uint8_t cmd_arg[2], TYPE type, GRP group);
 void adBmsWriteData(uint8_t tIC, cell_asic *ic, uint8_t cmd_arg[2], TYPE type, GRP group);
 uint32_t adBmsPollAdc(uint8_t tx_cmd[2]);
@@ -76,7 +85,7 @@ void adBms6830_Adax2
 (
   CH ch
 );
-
+*/
 #endif
 /** @}*/
 /** @}*/
