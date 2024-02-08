@@ -23,7 +23,7 @@
 /* USER CODE BEGIN Includes */
 #include <stdint.h>
 #include <string.h>
-#include "adBms6830CmdList.h"
+#include "custom_bms.h"
 #include "adBms6830GenericType.h"
 #include "adBms6830Data.h"
 #include "mcu_wrapper.h"
@@ -36,7 +36,9 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define TOTAL_IC				1
+
+
+#define C_VOLT_CONV(v)				(v*0.00015) + 1.5
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -51,7 +53,7 @@ SPI_HandleTypeDef hspi1;
 
 TIM_HandleTypeDef htim2;
 
-UART_HandleTypeDef huart1;
+UART_HandleTypeDef huart5;
 
 /* USER CODE BEGIN PV */
 
@@ -63,22 +65,12 @@ static void MX_GPIO_Init(void);
 static void MX_CAN1_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_TIM2_Init(void);
-static void MX_USART1_UART_Init(void);
+static void MX_UART5_Init(void);
 /* USER CODE BEGIN PFP */
-int __io_putchar(int ch){
-		/*
-		 * Have to use this to implement printf, or even printnf
-		 * Easiest solution => Use UART.
-		 * Problem => UART slow + Takes up pins. But lets see
-		 * Currently using SWV
-		 */
-//		ITM_SendChar(ch);
-		HAL_UART_Transmit(&huart1, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
-		return(ch);
-}
+int __io_putchar(int ch); // Printf works on uart4. Usart1 pins are used for something else on DISCO Board
+
 int current_loop(void);
 int voltage_loop(void);
-int adbms_config_at_init(void);
 
 void parse_print_fcell_measurement(uint8_t* buff);
 void parse_print_gpio_measurement(uint8_t* buff);
@@ -120,15 +112,14 @@ int main(void)
   MX_CAN1_Init();
   MX_SPI1_Init();
   MX_TIM2_Init();
-  MX_USART1_UART_Init();
+  MX_UART5_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-
-  adbms_config_at_init();
+  configBMS();
   while (1)
   {
 	  voltage_loop();
@@ -308,35 +299,35 @@ static void MX_TIM2_Init(void)
 }
 
 /**
-  * @brief USART1 Initialization Function
+  * @brief UART5 Initialization Function
   * @param None
   * @retval None
   */
-static void MX_USART1_UART_Init(void)
+static void MX_UART5_Init(void)
 {
 
-  /* USER CODE BEGIN USART1_Init 0 */
+  /* USER CODE BEGIN UART5_Init 0 */
 
-  /* USER CODE END USART1_Init 0 */
+  /* USER CODE END UART5_Init 0 */
 
-  /* USER CODE BEGIN USART1_Init 1 */
+  /* USER CODE BEGIN UART5_Init 1 */
 
-  /* USER CODE END USART1_Init 1 */
-  huart1.Instance = USART1;
-  huart1.Init.BaudRate = 115200;
-  huart1.Init.WordLength = UART_WORDLENGTH_8B;
-  huart1.Init.StopBits = UART_STOPBITS_1;
-  huart1.Init.Parity = UART_PARITY_NONE;
-  huart1.Init.Mode = UART_MODE_TX_RX;
-  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
-  if (HAL_UART_Init(&huart1) != HAL_OK)
+  /* USER CODE END UART5_Init 1 */
+  huart5.Instance = UART5;
+  huart5.Init.BaudRate = 115200;
+  huart5.Init.WordLength = UART_WORDLENGTH_8B;
+  huart5.Init.StopBits = UART_STOPBITS_1;
+  huart5.Init.Parity = UART_PARITY_NONE;
+  huart5.Init.Mode = UART_MODE_TX_RX;
+  huart5.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart5.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart5) != HAL_OK)
   {
     Error_Handler();
   }
-  /* USER CODE BEGIN USART1_Init 2 */
+  /* USER CODE BEGIN UART5_Init 2 */
 
-  /* USER CODE END USART1_Init 2 */
+  /* USER CODE END UART5_Init 2 */
 
 }
 
@@ -354,6 +345,8 @@ static void MX_GPIO_Init(void)
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_GPIOC_CLK_ENABLE();
+  __HAL_RCC_GPIOD_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2, GPIO_PIN_RESET);
@@ -386,38 +379,18 @@ int can_loop(void){
 
 int voltage_loop(void){
 	wakeup_chain(TOTAL_IC);
+	u8 cellVReg[34 * TOTAL_IC];		//RDCVALL Size .. Just padding
+	u8 auxVReg[24 * TOTAL_IC];			// Total Aux2 reg size + 2 for padding
 	/*
 	 * Tasks:
 	 * 1. Measure cell voltages
 	 * 2. Measure cell temperatures
 	 */
-	uint8_t AUX2_Start[] = {0x04, 0x00}; // And this why I don't like how they have written the libraries
+	pollCellVoltage(cellVReg);
+	parse_print_fcell_measurement(cellVReg);
 
-	uint32_t pec_err = 0; // To measure transmission error
-	uint8_t cmd_count_list[TOTAL_IC];
-	uint8_t gpio_rx_data[TOTAL_IC*10*2]; // 10 16 bit values for each adc
-	uint8_t cell_voltages[TOTAL_IC*RDFCALL_SIZE];
-
-	spiSendCmd(RDFCALL);
-
-	// Send 2950 command
-	HAL_Delay(1); // Simulating the sending
-	HAL_Delay(10); // Still have to wait for conversions
-
-	// Might have to shift to reading normal cell voltage. Daisy chains kinda lame fr fr
-	spiReadData(TOTAL_IC, RDCVALL, cell_voltages, &pec_err, cmd_count_list, RDFCALL_SIZE);
-//	printf("%2x %2x", cell_voltages[0], cell_voltages[1]);
-//	parse_print_fcell_measurement(cell_voltages);
-
-	spiSendCmd(AUX2_Start);
-	HAL_Delay(100); // Maybe it's better to poll this one.
-	spiReadData(TOTAL_IC, PLAUX2, gpio_rx_data, &pec_err, cmd_count_list, RX_DATA);
-//	parse_print_gpio_measurement(gpio_rx_data);
-
-//	printf("\n PEC_VAL = %d", pec_err);
-
-	// TODO: PARSE CELL TEMPERATURE HERE
-
+	pollAuxVoltage(auxVReg);
+	parse_print_gpio_measurement(auxVReg);
 
 	return 0;
 }
@@ -425,64 +398,6 @@ int voltage_loop(void){
 /*
  * @brief Sends config data at startup
  */
-int adbms_config_at_init(){
-	wakeup_chain(TOTAL_IC);
-	/*
-	 * Write config register A. Use WRCFGA.
-	 * Write config register B. Use WRCFGB.
-	 * Data frame structure: 7* (6830config + 2950config). Because Dasiy Chain
-	 */
-	uint8_t buff_6830_a[6];
-	uint8_t buff_6830_b[6];
-	uint8_t buff_2950_a[6];
-	uint8_t buff_2950_b[6];
-	uint8_t buff_data[TOTAL_IC*6];
-	// Init CONFIG REGISTER A constants. All magic numbers, but we will add the meaning in readme or docs
-	buff_6830_a[0] = 0x80; // Reference powered on
-	buff_6830_a[1] = 0x00; // All flags = 0
-
-	// TODO: Find out what SOAK does
-	buff_6830_a[2] = 0x00; // Control reg for soak functions. Cleared for now. Will set when soak is understood
-	buff_6830_a[3] = 0x00; // GPIOs [8:0] are not pulled down.(For ADC measurements)
-	buff_6830_a[4] = 0x00; // GPIOs 10 and 9 are not pulled down.
-	buff_6830_a[5] = 0b00000111; // bits [2:0] is for filter.
-	// We need to set bit 3 in the last byte for the last one in the daisy chain. We'll do it when we create the final buffer that is sent
-
-	buff_6830_b[0] = 0x00; // Under voltage value. Not sure right now
-	buff_6830_b[1] = 0x00; // Undervoltage and overvoltage
-	buff_6830_b[2] = 0x00; // Over voltage. Both are set to 1.5V when these registers are set to 0x00
-	buff_6830_b[3] = 0xFF; // Setting DTMEN and DTRNG. DCTO to full
-
-	// TODO: Find out what DCC does.]
-	buff_6830_b[4] = 0x00; // DCC to zero. Not sure what to set here
-	buff_6830_b[5] = 0x00; // DCC to zero
-
-	// TODO: Add 2950 config
-	/*
-	 * can't test config for 2950 because we don't know what they do.
-	 */
-
-	// Put the reg data into the buffer that will be sent
-	for(int x = 0  ; x < TOTAL_IC; x ++){
-
-		if(x == (TOTAL_IC-1)) buff_6830_a[5] |= 0b1<<3; // COMM_BK flag set for the last chain
-
-		memcpy(buff_data+(x*6 ), buff_6830_a, 6); // Index for 6830 for the segment.
-//		memcpy(buff_data+(x*12), buff_2950_a, 6); // Index for 2950 for the segment.
-	}
-
-	// Final data buffer will have 14*6 bytes for each config register
-	spiWriteData(TOTAL_IC, WRCFGA, buff_data); // Note this function reverses the data buffer while sending.
-
-	for(int x = 0 ; x < TOTAL_IC; x ++){
-		memcpy(buff_data+(x*6), buff_6830_b, 6); // Index for 6830 for the segment.
-//		memcpy(buff_data+(x*12 + 6), buff_2950_b, 6); // Index for 2950 for the segment.
-	}
-	// Final data buffer will have 14*6 bytes for each config register
-	spiWriteData(TOTAL_IC, WRCFGB, buff_data);
-
-	return 0;
-}
 
 
 
@@ -491,7 +406,7 @@ int adbms_config_at_init(){
 void parse_print_fcell_measurement(uint8_t* buff){
 	uint16_t fcell_values[16];
 	printf("\nFCELL VALUES: \n"); // Remove later. Only prints in debug mode.
-	FORIN(x, 16){
+	FORIN(x, 16*TOTAL_IC){
 		fcell_values[x] = buff[2*x]|buff[2*x + 1]<<8; // Not using memcpy because I am not sure about endianness
 		printf("%d  ", fcell_values[x]);
 		int __x = (x+1)%8? 0:  printf("\n"); // Hacky Prints a new line only every eight values
@@ -502,7 +417,7 @@ void parse_print_fcell_measurement(uint8_t* buff){
 void parse_print_gpio_measurement(uint8_t* buff){
 	uint16_t gpio_values[10];
 	printf("\nGPIO VALUES: \n"); // Remove later. Only prints in debug mode.
-	FORIN(x, 10){
+	FORIN(x, 10*TOTAL_IC){
 		gpio_values[x] = buff[2*x]|buff[2*x + 1]<<8; // Not using memcpy because I am not sure about endianness
 		printf("%d  ", gpio_values[x]);
 		int __x = (x+1)%8? 0 : printf("\n"); // Hacky// Prints a new line only every eight values
@@ -510,7 +425,17 @@ void parse_print_gpio_measurement(uint8_t* buff){
 
 }
 
-
+int __io_putchar(int ch){
+		/*
+		 * Have to use this to implement printf, or even printnf
+		 * Easiest solution => Use UART.
+		 * Problem => UART slow + Takes up pins. But lets see
+		 * Currently using SWV
+		 */
+//		ITM_SendChar(ch);
+		HAL_UART_Transmit(&huart5, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
+		return(ch);
+}
 
 /* USER CODE END 4 */
 

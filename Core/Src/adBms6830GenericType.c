@@ -161,9 +161,8 @@ void spiSendCmd(uint8_t tx_cmd[2])
   cmd_pec = Pec15_Calc(2, cmd);
   cmd[2] = (uint8_t)(cmd_pec >> 8);
   cmd[3] = (uint8_t)(cmd_pec);
-//  adBmsCsLow();
+  spiCSLow();
   spi_write(&cmd[0], 4);
-//  adBmsCsHigh();
 }
 /**
 *******************************************************************************
@@ -222,9 +221,9 @@ uint8_t regData_size
     cmd_pec = Pec15_Calc(2, cmd);
     cmd[2] = (uint8_t)(cmd_pec >> 8);
     cmd[3] = (uint8_t)(cmd_pec);
-//    adBmsCsLow(); // CS functions moved to "mcu_wrapper" functions. (Low level read write functions)
+    spiCSLow(); // CS functions moved to "mcu_wrapper" functions. (Low level read write functions)
     spi_read_write(&cmd[0], &data[0], RX_BUFFER);                 /* Read the configuration data of all ICs on the daisy chain into readdata array */
-//    adBmsCsHigh();
+    spiCSHigh();
     for (uint8_t current_ic = 0; current_ic < tIC; current_ic++)     /* executes for each ic in the daisy chain and packs the data */
     {																																      /* Into the r_comm array as well as check the received data for any bit errors */
       for (uint8_t current_byte = 0; current_byte < (BYTES_IN_REG-2); current_byte++)
@@ -316,9 +315,9 @@ uint8_t *data
       cmd[cmd_index] = (uint8_t)data_pec;
       cmd_index = cmd_index + 1;
     }
-//    adBmsCsLow();
+    spiCSLow();
     spi_write( &cmd[0], CMD_LEN);
-//    adBmsCsHigh();
+    spiCSHigh();
   }
   free(cmd); 
 }

@@ -28,4 +28,10 @@ int spi_read_write(u8 * tx_data, u8 * rx_data, u16 len);
 void wakeup_chain(u8);
 
 
+void spiCSHigh(void);
+
+void spiCSLow(void);
+
+
+
 #endif /* SRC_MCU_WRAPPER_H_ */

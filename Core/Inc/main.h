@@ -31,7 +31,7 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#define TOTAL_IC 			1
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/

@@ -22,7 +22,7 @@ and its licensor.
 #ifndef __ADBMSCOMMAND_H
 #define __ADBMSCOMMAND_H
 
-//#include "common.h"
+#include <stdint.h>
 
 // F**k these things. I will move all these to defines because I think it is ugly asf
 /* configuration registers commands */

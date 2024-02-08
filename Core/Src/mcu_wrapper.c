@@ -26,41 +26,40 @@ extern SPI_HandleTypeDef hspi1;
 
 
 int spi_write(u8 * tx_data, u16 size){
-	u16 pin_num = CS_PIN; // Lazy refactor
-	HAL_GPIO_WritePin(CS_PORT, pin_num, GPIO_PIN_RESET);
 	if(HAL_SPI_Transmit(&hspi1, tx_data, size, SPI_TIMEOUT) != HAL_OK){
-		HAL_GPIO_WritePin(CS_PORT, pin_num, GPIO_PIN_SET);
-		return -1;
-	}
-	HAL_GPIO_WritePin(CS_PORT, pin_num, GPIO_PIN_SET);
-	return 0;
-}
-
-int spi_read(u8 * rx_data, u16 size){
-	u16 pin_num = CS_PIN; // Lazy refactor
-	HAL_GPIO_WritePin(CS_PORT, pin_num, GPIO_PIN_RESET);
-	if(HAL_SPI_Receive(&hspi1,rx_data, size, SPI_TIMEOUT) != HAL_OK){
-		HAL_GPIO_WritePin(CS_PORT, pin_num, GPIO_PIN_SET);
-		printf("\n SPI COMM Failed");
+		printf("\n SPI TX Failed");
 		return -1;
 	}
 	printf("\n");
 	FORIN(x, size){
-		printf("%x ", rx_data[x]);
+			printf("%02x ", tx_data[x]);
 	}
-	HAL_GPIO_WritePin(CS_PORT, pin_num, GPIO_PIN_SET);
+	return 0;
+}
+
+int spi_read(u8 * rx_data, u16 size){
+	if(HAL_SPI_Receive(&hspi1,rx_data, size, SPI_TIMEOUT) != HAL_OK){
+		HAL_GPIO_WritePin(CS_PORT, CS_PIN, GPIO_PIN_SET);
+		printf("\n SPI RX Failed");
+		return -1;
+	}
+	printf("\n");
+	FORIN(x, size){
+		printf("%02x ", rx_data[x]);
+	}
 	return 0;
 }
 
 int spi_read_write(u8 * tx_data, u8 * rx_data, u16 len ){
-	u16 pin_num = CS_PIN; // Lazy refactor
-	HAL_GPIO_WritePin(CS_PORT, pin_num, GPIO_PIN_RESET);
 	HAL_SPI_Transmit(&hspi1, tx_data, len, SPI_TIMEOUT);
 	if(HAL_SPI_Receive(&hspi1,rx_data, len, SPI_TIMEOUT) != HAL_OK){
-			HAL_GPIO_WritePin(CS_PORT, pin_num, GPIO_PIN_SET);
+			printf("\n SPI RX Failed");
 			return -1;
 		}
-	HAL_GPIO_WritePin(CS_PORT, pin_num, GPIO_PIN_SET);
+	printf("\n");
+	FORIN(x, len){
+			printf("%02x ", rx_data[x]);
+	}
 	return 0;
 
 }
@@ -74,5 +73,13 @@ void wakeup_chain(u8 num_ic){
 	HAL_Delay(WAKE_DELAY);
 	}
 
+}
+
+void spiCSHigh(void){
+	HAL_GPIO_WritePin(CS_PORT, CS_PIN, GPIO_PIN_SET);
+}
+
+void spiCSLow(void){
+	HAL_GPIO_WritePin(CS_PORT, CS_PIN, GPIO_PIN_RESET);
 }
 
