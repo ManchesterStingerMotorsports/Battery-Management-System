@@ -17,13 +17,13 @@
 #define RDCALL_SIZE 		34
 #define ONE_REG_SIZE		6
 
-u8 startCellMeasure[2] = {0x02, 0x70}; // Hard coding for now // This should poll adc too actually
+u8 startCellMeasure[2] = {0x02, 0xF0}; // Hard coding for now // This should poll adc too actually
 // bit 10: 	0
 // bit 9:  	1
-// bit 8:	0 		// Not using S adc
+// bit 8:	0 		// Not using S adc RD bit
 // byte: 0x2		//bit[3:7] have to be zero
 
-// bit 7:	0 		// Single shot measurement, 1 For continuous
+// bit 7:	1 		// Single shot measurement, 1 For continuous
 // bit 6:	1
 // bit 5:	1
 // bit 4:	1 		// DCP bit is set so cell discharging for balancing is possible during measurement
@@ -31,9 +31,9 @@ u8 startCellMeasure[2] = {0x02, 0x70}; // Hard coding for now // This should pol
 // bit 2:	0		// Not resetting the filter since it's not required yet
 // bit 1:	0
 // bit 0:	0		// OW[1:0] Set to not check for open wire for now
-// byte: 0x70
+// byte: 0xF0
 
-u8 startAux2Measurement[2] = {0x04, 0x70}; //
+u8 startAux2Measurement[2] = {0x04, 0x40}; //
 // bit 10: 	1		// Yep this is correct for AUX2
 // bit 9:  	0
 // bit 8:	0 		// Not using S adc
@@ -47,7 +47,7 @@ u8 startAux2Measurement[2] = {0x04, 0x70}; //
 // bit 2:	0
 // bit 1:	0
 // bit 0:	0		// CH[3:0] is set to 0000 so everything is measured
-// byte: 0x70
+// byte: 0x40
 
 
 
@@ -66,7 +66,7 @@ int configBMS(void){
 
 
 		// Init CONFIG REGISTER A constants. All magic numbers, but we will add the meaning in readme or docs
-		buff_6830_a[0] = 0x80; // Reference powered on
+		buff_6830_a[0] = 0x00; // Reference powered on
 		buff_6830_a[1] = 0x00; // All flags = 0
 
 		// TODO: Find out what SOAK does
@@ -79,7 +79,7 @@ int configBMS(void){
 		buff_6830_b[0] = 0x00; // Under voltage value. Not sure right now
 		buff_6830_b[1] = 0x00; // Undervoltage and overvoltage
 		buff_6830_b[2] = 0x00; // Over voltage. Both are set to 1.5V when these registers are set to 0x00
-		buff_6830_b[3] = 0xFF; // Setting DTMEN and DTRNG. DCTO to full
+		buff_6830_b[3] = 0b00111111; // Setting DTMEN and DTRNG. DCTO to full
 
 		// TODO: Find out what DCC does.]
 		buff_6830_b[4] = 0x00; // DCC to zero. Not sure what to set here
@@ -129,10 +129,10 @@ int pollCellVoltage(u8* rxdata){
 
 
 	spiSendCmd(startCellMeasure); // This should
-//	spiCSHigh(); // spiSendCmd pulls CS low before sending. It doesn't pull it back up high so we don't use another function for polling
-//	spiSendCmd(PLADC);
+	spiCSHigh(); // spiSendCmd pulls CS low before sending. It doesn't pull it back up high so we don't use another function for polling
+	spiSendCmd(PLADC);
 	while(_dumpbyte != 0xFF){
-		spiReadByte(&_dumpbyte, 1);
+		spi_read(&_dumpbyte, 1);
 	}
 	spiCSHigh();
 
@@ -156,10 +156,10 @@ int pollAuxVoltage(u8* rxdata){
 	u8 cmd_cnt[TOTAL_IC];
 
 	spiSendCmd(startAux2Measurement); // This should
-//	spiCSHigh(); // spiSendCmd pulls CS low before sending. It doesn't pull it back up high so we don't use another function for polling
-//	spiSendCmd(PLADC);
+	spiCSHigh(); // spiSendCmd pulls CS low before sending. It doesn't pull it back up high so we don't use another function for polling
+	spiSendCmd(PLADC);
 	while(_dumpbyte != 0xFF){
-		spiReadByte(&_dumpbyte, 1);
+		spi_read(&_dumpbyte, 1);
 	}
 	spiCSHigh();
 
@@ -171,4 +171,31 @@ int pollAuxVoltage(u8* rxdata){
 		retval = pecerr;
 	}
 	return retval;
+}
+
+
+int readCFG(void){
+	u8 cfgBuffer[TOTAL_IC*6];
+	uint32_t pecerr = 0;
+	u8 cmd_cnt[TOTAL_IC];
+
+
+	spiReadData(TOTAL_IC, RDCFGA, cfgBuffer, &pecerr, cmd_cnt,  ONE_REG_SIZE);
+
+	printf("\n\rCFGA: ");
+
+	FORIN(i, 6){
+		printf("%02x ", cfgBuffer[i]);
+	}
+
+
+	spiReadData(TOTAL_IC, RDCFGB, cfgBuffer, &pecerr, cmd_cnt,  ONE_REG_SIZE);
+
+	printf("\n\rCFGB: ");
+
+	FORIN(i, 6){
+		printf("%02x ", cfgBuffer[i]);
+	}
+
+	return 0;
 }

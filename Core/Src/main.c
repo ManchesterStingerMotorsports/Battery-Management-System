@@ -122,9 +122,12 @@ int main(void)
   configBMS();
   while (1)
   {
+	  readCFG();
+
 	  voltage_loop();
-	  HAL_Delay(100);
-	  printf("\nALIVE \n");
+
+	  HAL_Delay(1000);
+	  printf("\n\rALIVE \n\r");
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -381,16 +384,25 @@ int voltage_loop(void){
 	wakeup_chain(TOTAL_IC);
 	u8 cellVReg[34 * TOTAL_IC];		//RDCVALL Size .. Just padding
 	u8 auxVReg[24 * TOTAL_IC];			// Total Aux2 reg size + 2 for padding
+	memset(cellVReg, 0x00, 34 * TOTAL_IC);
+	memset(auxVReg, 0x00, 24 * TOTAL_IC);
+	uint32_t timeStamp = 0;
+
 	/*
 	 * Tasks:
 	 * 1. Measure cell voltages
 	 * 2. Measure cell temperatures
 	 */
+
+	timeStamp = HAL_GetTick();
 	pollCellVoltage(cellVReg);
 	parse_print_fcell_measurement(cellVReg);
+	printf("\n\rCell Mes Time stamp: %d ", HAL_GetTick() - timeStamp);
 
+	timeStamp = HAL_GetTick();
 	pollAuxVoltage(auxVReg);
 	parse_print_gpio_measurement(auxVReg);
+	printf("\n\rGPIO Time stamp: %d ", HAL_GetTick() - timeStamp);
 
 	return 0;
 }
@@ -405,22 +417,22 @@ int voltage_loop(void){
 // Just printing values for now
 void parse_print_fcell_measurement(uint8_t* buff){
 	uint16_t fcell_values[16];
-	printf("\nFCELL VALUES: \n"); // Remove later. Only prints in debug mode.
+	printf("\n\rFCELL VALUES: \n\r"); // Remove later. Only prints in debug mode.
 	FORIN(x, 16*TOTAL_IC){
 		fcell_values[x] = buff[2*x]|buff[2*x + 1]<<8; // Not using memcpy because I am not sure about endianness
 		printf("%d  ", fcell_values[x]);
-		int __x = (x+1)%8? 0:  printf("\n"); // Hacky Prints a new line only every eight values
+		int __x = (x+1)%8? 0:  printf("\n\r"); // Hacky Prints a new line only every eight values
 	}
 
 }
 
 void parse_print_gpio_measurement(uint8_t* buff){
 	uint16_t gpio_values[10];
-	printf("\nGPIO VALUES: \n"); // Remove later. Only prints in debug mode.
+	printf("\n\rGPIO VALUES: \n\r"); // Remove later. Only prints in debug mode.
 	FORIN(x, 10*TOTAL_IC){
 		gpio_values[x] = buff[2*x]|buff[2*x + 1]<<8; // Not using memcpy because I am not sure about endianness
 		printf("%d  ", gpio_values[x]);
-		int __x = (x+1)%8? 0 : printf("\n"); // Hacky// Prints a new line only every eight values
+		int __x = (x+1)%8? 0 : printf("\n\r"); // Hacky// Prints a new line only every eight values
 	}
 
 }
