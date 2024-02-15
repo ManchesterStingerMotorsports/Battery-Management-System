@@ -21,26 +21,26 @@ u8 startCellMeasure[2] = {0x02, 0xF0}; // Hard coding for now // This should pol
 // bit 10: 	0
 // bit 9:  	1
 // bit 8:	0 		// Not using S adc RD bit
-// byte: 0x2		//bit[3:7] have to be zero
+// byte: 0x02		//bit[3:7] have to be zero
 
-// bit 7:	1 		// Single shot measurement, 1 For continuous
+// bit 7:	0 		// Single shot measurement, 1 For continuous
 // bit 6:	1
 // bit 5:	1
-// bit 4:	1 		// DCP bit is set so cell discharging for balancing is possible during measurement
+// bit 4:	0 		// DCP bit is set so cell discharging for balancing is possible during measurement
 // bit 3:	0
 // bit 2:	0		// Not resetting the filter since it's not required yet
 // bit 1:	0
 // bit 0:	0		// OW[1:0] Set to not check for open wire for now
-// byte: 0xF0
+// byte: 0x60
 
-u8 startAux2Measurement[2] = {0x04, 0x40}; //
-// bit 10: 	1		// Yep this is correct for AUX2
+u8 startAux2Measurement[2] = {0x04, 0x00}; //
+// bit 10: 	1		// This is correct. Trust
 // bit 9:  	0
 // bit 8:	0 		// Not using S adc
-// byte: 0x2		//bit[3:7] have to be zero
+// byte: 0x04
 
-// bit 7:	0 		// Single shot measurement, 1 For continuous
-// bit 6:	1
+// bit 7:	0 		// Second byte is all zero if we are reading all gpios
+// bit 6:	0
 // bit 5:	0
 // bit 4:	0
 // bit 3:	0
@@ -66,7 +66,7 @@ int configBMS(void){
 
 
 		// Init CONFIG REGISTER A constants. All magic numbers, but we will add the meaning in readme or docs
-		buff_6830_a[0] = 0x00; // Reference powered on
+		buff_6830_a[0] = (0x01<<7); // Reference powered on
 		buff_6830_a[1] = 0x00; // All flags = 0
 
 		// TODO: Find out what SOAK does
@@ -93,7 +93,8 @@ int configBMS(void){
 		// Put the reg data into the buffer that will be sent
 		for(int x = 0  ; x < TOTAL_IC; x ++){
 
-			if(x == (TOTAL_IC-1)) buff_6830_a[5] |= 0b1<<3; // COMM_BK flag set for the last chain
+			//if(x == (TOTAL_IC-1)) buff_6830_a[5] |= 0b1<<3; // COMM_BK flag set for the last chain
+			// The do not set this bit in the example code
 
 			memcpy(buff_data+(x*6 ), buff_6830_a, 6); // Index for 6830 for the segment.
 	//		memcpy(buff_data+(x*12), buff_2950_a, 6); // Index for 2950 for the segment.
@@ -155,14 +156,15 @@ int pollAuxVoltage(u8* rxdata){
 	uint32_t pecerr = 0;
 	u8 cmd_cnt[TOTAL_IC];
 
-	spiSendCmd(startAux2Measurement); // This should
+	spiSendCmd(startAux2Measurement); // This should work :)
 	spiCSHigh(); // spiSendCmd pulls CS low before sending. It doesn't pull it back up high so we don't use another function for polling
-	spiSendCmd(PLADC);
+	spiSendCmd(PLAUX2);
 	while(_dumpbyte != 0xFF){
 		spi_read(&_dumpbyte, 1);
 	}
 	spiCSHigh();
 
+	// No read aux2 all command unfort
 	spiReadData(TOTAL_IC, RDRAXA, rxdata, &pecerr, cmd_cnt,  ONE_REG_SIZE);
 	spiReadData(TOTAL_IC, RDRAXB, rxdata + 6, &pecerr, cmd_cnt,  ONE_REG_SIZE);
 	spiReadData(TOTAL_IC, RDRAXC, rxdata + 12, &pecerr, cmd_cnt,  ONE_REG_SIZE);

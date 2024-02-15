@@ -377,6 +377,7 @@ int can_loop(void){
 	/*
 	 * Handle comm with aux computer
 	 */
+
 	return 0;
 }
 
