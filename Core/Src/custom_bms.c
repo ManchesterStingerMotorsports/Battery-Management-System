@@ -71,14 +71,14 @@ int configBMS(void){
 
 		// TODO: Find out what SOAK does
 		buff_6830_a[2] = 0x00; // Control reg for soak functions. Cleared for now. Will set when soak is understood
-		buff_6830_a[3] = 0x00; // GPIOs [8:0] are not pulled down.(For ADC measurements)
-		buff_6830_a[4] = 0x00; // GPIOs 10 and 9 are not pulled down.
+		buff_6830_a[3] = 0xFF; // GPIOs [8:0] are all pulled down.(For ADC measurements)
+		buff_6830_a[4] = 0x03; // GPIOs 10 and 9 are not pulled down.
 		buff_6830_a[5] = 0b00000111; // bits [2:0] is for filter.
 		// We need to set bit 3 in the last byte for the last one in the daisy chain. We'll do it when we create the final buffer that is sent
 
-		buff_6830_b[0] = 0x00; // Under voltage value. Not sure right now
-		buff_6830_b[1] = 0x00; // Undervoltage and overvoltage
-		buff_6830_b[2] = 0x00; // Over voltage. Both are set to 1.5V when these registers are set to 0x00
+		buff_6830_b[0] = 0x71; // Under voltage value. Not sure right now
+		buff_6830_b[1] = 0x52; // Undervoltage and overvoltage
+		buff_6830_b[2] = 0x46; // Over voltage. Both are set to 1.5V when these registers are set to 0x00
 		buff_6830_b[3] = 0b00111111; // Setting DTMEN and DTRNG. DCTO to full
 
 		// TODO: Find out what DCC does.]
@@ -137,9 +137,14 @@ int pollCellVoltage(u8* rxdata){
 	}
 	spiCSHigh();
 
-	spiReadData(TOTAL_IC, RDCVALL, rxdata, &pecerr, cmd_cnt, RDCALL_SIZE);
-	if(pecerr > 0){
-		retval = pecerr;
+	FORIN(__j, 1){
+	spiReadData(TOTAL_IC, RDCVA, rxdata, &pecerr, cmd_cnt, 8);
+	spiReadData(TOTAL_IC, RDCVB, rxdata + 6, &pecerr, cmd_cnt, 8);
+	spiReadData(TOTAL_IC, RDCVC, rxdata + 12, &pecerr, cmd_cnt, 8);
+	spiReadData(TOTAL_IC, RDCVD, rxdata + 18, &pecerr, cmd_cnt, 8);
+	spiReadData(TOTAL_IC, RDCVE, rxdata + 24, &pecerr, cmd_cnt, 8);
+
+	retval = pecerr;
 	}
 	return retval;
 }
@@ -161,6 +166,7 @@ int pollAuxVoltage(u8* rxdata){
 	spiSendCmd(PLAUX2);
 	while(_dumpbyte != 0xFF){
 		spi_read(&_dumpbyte, 1);
+		printf("Polling\n\r");
 	}
 	spiCSHigh();
 
@@ -189,6 +195,8 @@ int readCFG(void){
 	FORIN(i, 6){
 		printf("%02x ", cfgBuffer[i]);
 	}
+	printf("\n\rPEC:%lu", pecerr);
+	memset(cfgBuffer, 0x00, TOTAL_IC*6);
 
 
 	spiReadData(TOTAL_IC, RDCFGB, cfgBuffer, &pecerr, cmd_cnt,  ONE_REG_SIZE);
@@ -198,6 +206,46 @@ int readCFG(void){
 	FORIN(i, 6){
 		printf("%02x ", cfgBuffer[i]);
 	}
+	printf("\n\rPEC:%lu", pecerr);
 
 	return 0;
 }
+
+
+int readSID(void){
+	u8 cfgBuffer[TOTAL_IC*6];
+	uint32_t pecerr = 0;
+	u8 cmd_cnt[TOTAL_IC];
+
+
+	spiReadData(TOTAL_IC, RDSID, cfgBuffer, &pecerr, cmd_cnt,  ONE_REG_SIZE);
+
+	printf("\n\rSID: ");
+
+	FORIN(i, 6){
+		printf("%02x ", cfgBuffer[i]);
+	}
+	printf("\n\rPEC:%lu", pecerr);
+
+	return 0;
+}
+
+int readStatErr(void){
+	u8 statBuffer[TOTAL_IC*6];
+	uint32_t pecerr = 0;
+	u8 cmd_cnt[TOTAL_IC];
+	memset(statBuffer, 0x00, TOTAL_IC*6);
+
+	spiReadData(TOTAL_IC, RDSTATC, statBuffer, &pecerr, cmd_cnt,  ONE_REG_SIZE);
+
+	printf("\n\rSTATERR: ");
+
+	FORIN(i, 6){
+			printf("%02x ", statBuffer[i]);
+		}
+
+	printf("\n\rPEC:%lu", pecerr);
+
+	return 0;
+}
+

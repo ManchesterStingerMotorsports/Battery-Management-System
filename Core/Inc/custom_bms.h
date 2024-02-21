@@ -19,6 +19,8 @@ int pollCellVoltage(u8*);
 int requestAuxVoltage(void);
 int pollAuxVoltage(u8*);
 int readCFG(void);
+int readSID(void);
+int readStatErr(void);
 
 
 

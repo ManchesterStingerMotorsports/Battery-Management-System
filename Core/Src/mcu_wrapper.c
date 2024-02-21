@@ -56,10 +56,10 @@ int spi_read_write(u8 * tx_data, u8 * rx_data, u16 len ){
 			printf("\n\r SPI RX Failed");
 			return -1;
 		}
-//	printf("\n\r");
-//	FORIN(x, len){
-//			printf("%02x ", rx_data[x]);
-//	}
+	printf("\n\r");
+	FORIN(x, len){
+			printf("%02x ", rx_data[x]);
+	}
 	return 0;
 
 }

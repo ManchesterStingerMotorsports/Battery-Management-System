@@ -38,7 +38,8 @@
 /* USER CODE BEGIN PD */
 
 
-#define C_VOLT_CONV(v)				(v*0.00015) + 1.5
+#define C_VOLT_CONV(v)				((v + 10000) * 0.000150)
+// old formula (v*0.00015) + 1.5
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -54,6 +55,7 @@ SPI_HandleTypeDef hspi1;
 TIM_HandleTypeDef htim2;
 
 UART_HandleTypeDef huart5;
+UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 
@@ -66,13 +68,14 @@ static void MX_CAN1_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_UART5_Init(void);
+static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN PFP */
 int __io_putchar(int ch); // Printf works on uart4. Usart1 pins are used for something else on DISCO Board
 
 int current_loop(void);
 int voltage_loop(void);
 
-void parse_print_fcell_measurement(uint8_t* buff);
+void parse_print_cell_measurement(uint8_t* buff);
 void parse_print_gpio_measurement(uint8_t* buff);
 /* USER CODE END PFP */
 
@@ -113,6 +116,7 @@ int main(void)
   MX_SPI1_Init();
   MX_TIM2_Init();
   MX_UART5_Init();
+  MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
@@ -123,6 +127,8 @@ int main(void)
   while (1)
   {
 	  readCFG();
+//	  readStatErr();
+	  readSID();
 
 	  voltage_loop();
 
@@ -241,7 +247,7 @@ static void MX_SPI1_Init(void)
   hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_4;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_64;
   hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -335,6 +341,39 @@ static void MX_UART5_Init(void)
 }
 
 /**
+  * @brief USART2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART2_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART2_Init 0 */
+
+  /* USER CODE END USART2_Init 0 */
+
+  /* USER CODE BEGIN USART2_Init 1 */
+
+  /* USER CODE END USART2_Init 1 */
+  huart2.Instance = USART2;
+  huart2.Init.BaudRate = 115200;
+  huart2.Init.WordLength = UART_WORDLENGTH_8B;
+  huart2.Init.StopBits = UART_STOPBITS_1;
+  huart2.Init.Parity = UART_PARITY_NONE;
+  huart2.Init.Mode = UART_MODE_TX_RX;
+  huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart2.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART2_Init 2 */
+
+  /* USER CODE END USART2_Init 2 */
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -383,7 +422,7 @@ int can_loop(void){
 
 int voltage_loop(void){
 	wakeup_chain(TOTAL_IC);
-	u8 cellVReg[34 * TOTAL_IC];		//RDCVALL Size .. Just padding
+	u8 cellVReg[36 * TOTAL_IC];		//RDCVALL Size .. Just padding
 	u8 auxVReg[24 * TOTAL_IC];			// Total Aux2 reg size + 2 for padding
 	memset(cellVReg, 0x00, 34 * TOTAL_IC);
 	memset(auxVReg, 0x00, 24 * TOTAL_IC);
@@ -396,14 +435,16 @@ int voltage_loop(void){
 	 */
 
 	timeStamp = HAL_GetTick();
-	pollCellVoltage(cellVReg);
-	parse_print_fcell_measurement(cellVReg);
-	printf("\n\rCell Mes Time stamp: %d ", HAL_GetTick() - timeStamp);
+	printf("PEC: %d",pollCellVoltage(cellVReg));
+	printf("\n\rCell Mes Time stamp: %lu ", HAL_GetTick() - timeStamp);
+	parse_print_cell_measurement(cellVReg);
 
-	timeStamp = HAL_GetTick();
-	pollAuxVoltage(auxVReg);
-	parse_print_gpio_measurement(auxVReg);
-	printf("\n\rGPIO Time stamp: %d ", HAL_GetTick() - timeStamp);
+//
+//	timeStamp = HAL_GetTick();
+//	printf("PEC: %d",pollAuxVoltage(auxVReg));
+//	printf("\n\rGPIO Time stamp: %lu ", HAL_GetTick() - timeStamp);
+//	parse_print_gpio_measurement(auxVReg);
+
 
 	return 0;
 }
@@ -416,19 +457,22 @@ int voltage_loop(void){
 
 
 // Just printing values for now
-void parse_print_fcell_measurement(uint8_t* buff){
-	uint16_t fcell_values[16];
-	printf("\n\rFCELL VALUES: \n\r"); // Remove later. Only prints in debug mode.
+void parse_print_cell_measurement(uint8_t* buff){
+	uint16_t cell_values[16*TOTAL_IC];
+	printf("\n\rCELL VALUES: \n\r"); // Remove later. Only prints in debug mode.
 	FORIN(x, 16*TOTAL_IC){
-		fcell_values[x] = buff[2*x]|buff[2*x + 1]<<8; // Not using memcpy because I am not sure about endianness
-		printf("%d  ", fcell_values[x]);
+		float temp = 0.0;
+		cell_values[x] = buff[2*x]|buff[2*x + 1]<<8; // Not using memcpy because I am not sure about endianness
+		temp = C_VOLT_CONV(cell_values[x]);
+
+		printf("%.02f  ", temp);
 		int __x = (x+1)%8? 0:  printf("\n\r"); // Hacky Prints a new line only every eight values
 	}
 
 }
 
 void parse_print_gpio_measurement(uint8_t* buff){
-	uint16_t gpio_values[10];
+	uint16_t gpio_values[20*TOTAL_IC];
 	printf("\n\rGPIO VALUES: \n\r"); // Remove later. Only prints in debug mode.
 	FORIN(x, 10*TOTAL_IC){
 		gpio_values[x] = buff[2*x]|buff[2*x + 1]<<8; // Not using memcpy because I am not sure about endianness
@@ -438,15 +482,13 @@ void parse_print_gpio_measurement(uint8_t* buff){
 
 }
 
+/*
+ * Not using itm since it needs debug mode to run and isoSPI needs
+ */
 int __io_putchar(int ch){
-		/*
-		 * Have to use this to implement printf, or even printnf
-		 * Easiest solution => Use UART.
-		 * Problem => UART slow + Takes up pins. But lets see
-		 * Currently using SWV
-		 */
+
 //		ITM_SendChar(ch);
-		HAL_UART_Transmit(&huart5, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
+		HAL_UART_Transmit(&huart2, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
 		return(ch);
 }
 
