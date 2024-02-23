@@ -18,7 +18,7 @@
 #define ONE_REG_SIZE		6
 #define RX_SIZE				8
 
-u8 startCellMeasure[2] = {0x02, 0xF0}; // Hard coding for now // This should poll adc too actually
+u8 startCellMeasure[2] = {0x02, 0x60}; // Hard coding for now // This should poll adc too actually
 // bit 10: 	0
 // bit 9:  	1
 // bit 8:	0 		// Not using S adc RD bit
@@ -140,6 +140,7 @@ int pollCellVoltage(u8* rxdata){
 	wakeup_chain(TOTAL_IC);
 
 	spiSendCmd(startCellMeasure); // This should
+	spiCSHigh();
 	spiSendCmd(startCellMeasure);
 	spiCSHigh(); // spiSendCmd pulls CS low before sending. It doesn't pull it back up high so we don't use another function for polling
 	spiSendCmd(PLADC);
@@ -175,11 +176,13 @@ int pollAuxVoltage(u8* rxdata){
 
 
 	spiSendCmd(startAux2Measurement); // This should work :)
+	spiCSHigh();
+	spiSendCmd(startAux2Measurement);
 	spiCSHigh(); // spiSendCmd pulls CS low before sending. It doesn't pull it back up high so we don't use another function for polling
 	spiSendCmd(PLAUX2);
 	while(_dumpbyte != 0xFF){
 		spi_read(&_dumpbyte, 1);
-		printf("Polling\n\r");
+//		printf("Polling\n\r");
 	}
 	spiCSHigh();
 
@@ -238,7 +241,7 @@ int readSID(void){
 	u8 cmd_cnt[TOTAL_IC];
 
 
-	spiReadData(TOTAL_IC, RDSID, cfgBuffer, &pecerr, cmd_cnt,  ONE_REG_SIZE);
+	spiReadData(TOTAL_IC, RDSID, cfgBuffer, &pecerr, cmd_cnt,  RX_SIZE);
 
 	printf("\n\rSID: ");
 
@@ -256,7 +259,7 @@ int readStatErr(void){
 	u8 cmd_cnt[TOTAL_IC];
 	memset(statBuffer, 0x00, TOTAL_IC*6);
 
-	spiReadData(TOTAL_IC, RDSTATC, statBuffer, &pecerr, cmd_cnt,  ONE_REG_SIZE);
+	spiReadData(TOTAL_IC, RDSTATC, statBuffer, &pecerr, cmd_cnt,  RX_SIZE);
 
 	printf("\n\rSTATERR: ");
 

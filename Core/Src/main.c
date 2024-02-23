@@ -444,11 +444,11 @@ int voltage_loop(void){
 	printf("\n\rCell Mes Time stamp: %lu ",timeStamp2);
 	parse_print_cell_measurement(cellVReg);
 
-//
-//	timeStamp = HAL_GetTick();
-//	printf("PEC: %d",pollAuxVoltage(auxVReg));
-//	printf("\n\rGPIO Time stamp: %lu ", HAL_GetTick() - timeStamp);
-//	parse_print_gpio_measurement(auxVReg);
+
+	timeStamp = HAL_GetTick();
+	printf("PEC: %d",pollAuxVoltage(auxVReg));
+	printf("\n\rGPIO Time stamp: %lu ", HAL_GetTick() - timeStamp);
+	parse_print_gpio_measurement(auxVReg);
 
 
 	return 0;
@@ -473,8 +473,8 @@ void parse_print_cell_measurement(uint8_t* buff){
 		cell_values[x] = buff[2*x]|buff[2*x + 1]<<8; // Not using memcpy because I am not sure about endianness
 		temp = C_VOLT_CONV(cell_values[x]);
 
-//		printf("%.02f  ", temp);
-		printf("%x  ", cell_values[x]);
+		printf("%.02f  ", temp);
+		printf("%d  ", cell_values[x]);
 		int __x = (x+1)%8? 0:  printf("\n\r"); // Hacky Prints a new line only every eight values
 	}
 
