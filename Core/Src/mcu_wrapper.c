@@ -30,10 +30,10 @@ int spi_write(u8 * tx_data, u16 size){
 		printf("\n\r SPI TX Failed");
 		return -1;
 	}
-	printf("\n\r");
-	FORIN(x, size){
-			printf("%02x ", tx_data[x]);
-	}
+//	printf("\n\r");
+//	FORIN(x, size){
+//			printf("%02x ", tx_data[x]);
+//	}
 	return 0;
 }
 
@@ -51,15 +51,15 @@ int spi_read(u8 * rx_data, u16 size){
 }
 
 int spi_read_write(u8 * tx_data, u8 * rx_data, u16 len ){
-	HAL_SPI_Transmit(&hspi1, tx_data, len, SPI_TIMEOUT);
+	HAL_SPI_Transmit(&hspi1, tx_data, 4, SPI_TIMEOUT);
 	if(HAL_SPI_Receive(&hspi1,rx_data, len, SPI_TIMEOUT) != HAL_OK){
 			printf("\n\r SPI RX Failed");
 			return -1;
 		}
-	printf("\n\r");
-	FORIN(x, len){
-			printf("%02x ", rx_data[x]);
-	}
+//	printf("\n\r");
+//	FORIN(x, len){
+//			printf("%02x ", rx_data[x]);
+//	}
 	return 0;
 
 }

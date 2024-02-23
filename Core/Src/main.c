@@ -126,14 +126,17 @@ int main(void)
   configBMS();
   while (1)
   {
-	  readCFG();
-//	  readStatErr();
-	  readSID();
 
+
+//	  readSID();
+//	  configBMS();
+	  readCFG();
 	  voltage_loop();
 
+	  readStatErr();
+
 	  HAL_Delay(1000);
-	  printf("\n\rALIVE \n\r");
+//	  printf("\n\rALIVE \n\r");
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -164,7 +167,7 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
   RCC_OscInitStruct.PLL.PLLM = 8;
-  RCC_OscInitStruct.PLL.PLLN = 168;
+  RCC_OscInitStruct.PLL.PLLN = 64;
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
   RCC_OscInitStruct.PLL.PLLQ = 4;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
@@ -178,10 +181,10 @@ void SystemClock_Config(void)
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;
-  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV16;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
   {
     Error_Handler();
   }
@@ -247,7 +250,7 @@ static void MX_SPI1_Init(void)
   hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_64;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
   hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -421,12 +424,13 @@ int can_loop(void){
 }
 
 int voltage_loop(void){
-	wakeup_chain(TOTAL_IC);
-	u8 cellVReg[36 * TOTAL_IC];		//RDCVALL Size .. Just padding
+//	wakeup_chain(TOTAL_IC);
+	u8 cellVReg[32 * TOTAL_IC];		//RDCVALL Size .. Just padding
 	u8 auxVReg[24 * TOTAL_IC];			// Total Aux2 reg size + 2 for padding
-	memset(cellVReg, 0x00, 34 * TOTAL_IC);
+	memset(cellVReg, 0x00, 32 * TOTAL_IC);
 	memset(auxVReg, 0x00, 24 * TOTAL_IC);
 	uint32_t timeStamp = 0;
+	uint32_t timeStamp2 = 0;
 
 	/*
 	 * Tasks:
@@ -435,8 +439,9 @@ int voltage_loop(void){
 	 */
 
 	timeStamp = HAL_GetTick();
-	printf("PEC: %d",pollCellVoltage(cellVReg));
-	printf("\n\rCell Mes Time stamp: %lu ", HAL_GetTick() - timeStamp);
+	printf("\n\rPEC: %d",pollCellVoltage(cellVReg));
+	timeStamp2 = HAL_GetTick() - timeStamp;
+	printf("\n\rCell Mes Time stamp: %lu ",timeStamp2);
 	parse_print_cell_measurement(cellVReg);
 
 //
@@ -458,14 +463,18 @@ int voltage_loop(void){
 
 // Just printing values for now
 void parse_print_cell_measurement(uint8_t* buff){
-	uint16_t cell_values[16*TOTAL_IC];
+	int16_t cell_values[16*TOTAL_IC];
+	memset(cell_values, 0x0000, 16*TOTAL_IC*sizeof(uint16_t));
+
 	printf("\n\rCELL VALUES: \n\r"); // Remove later. Only prints in debug mode.
-	FORIN(x, 16*TOTAL_IC){
+
+		FORIN(x, 16*TOTAL_IC){
 		float temp = 0.0;
 		cell_values[x] = buff[2*x]|buff[2*x + 1]<<8; // Not using memcpy because I am not sure about endianness
 		temp = C_VOLT_CONV(cell_values[x]);
 
-		printf("%.02f  ", temp);
+//		printf("%.02f  ", temp);
+		printf("%x  ", cell_values[x]);
 		int __x = (x+1)%8? 0:  printf("\n\r"); // Hacky Prints a new line only every eight values
 	}
 
