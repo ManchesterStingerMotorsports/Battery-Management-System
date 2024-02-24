@@ -7,9 +7,16 @@ Hardware:
  - ADBMS2950
  - ADBMS6822
  
- # NOT EVEN CLOSE TO COMPLETE
+## COMPLETED:
+ ADBMS6830:
+    - Accurate Cell voltage measurement
+    - Accurate GPIO adc measurement
+ 
+
+
+## NOT EVEN CLOSE TO COMPLETE
  
  TODO:
- - ADBMS6830 tests
+ - Fault handler for data received from ADBMS6830
  - ADBMS2950 init and monitoring
  - CAN Communication 

@@ -39,6 +39,7 @@
 
 
 #define C_VOLT_CONV(v)				((v + 10000) * 0.000150)
+
 // old formula (v*0.00015) + 1.5
 /* USER CODE END PD */
 
@@ -481,10 +482,14 @@ void parse_print_cell_measurement(uint8_t* buff){
 }
 
 void parse_print_gpio_measurement(uint8_t* buff){
-	uint16_t gpio_values[20*TOTAL_IC];
+	int16_t gpio_values[20*TOTAL_IC];
+	float temp = 0.0;
 	printf("\n\rGPIO VALUES: \n\r"); // Remove later. Only prints in debug mode.
 	FORIN(x, 10*TOTAL_IC){
 		gpio_values[x] = buff[2*x]|buff[2*x + 1]<<8; // Not using memcpy because I am not sure about endianness
+		temp = C_VOLT_CONV(gpio_values[x]);
+
+		printf("%.02f  ", temp);
 		printf("%d  ", gpio_values[x]);
 		int __x = (x+1)%8? 0 : printf("\n\r"); // Hacky// Prints a new line only every eight values
 	}
