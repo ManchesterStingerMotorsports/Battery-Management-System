@@ -37,8 +37,18 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
-
+#define SHUNT 						50
 #define C_VOLT_CONV(v)				((v + 10000) * 0.000150)
+/*
+This formula is really weird. It gives us the reading in minivolts.
+The key is that >> and << are arithmetic shifts and >>> and <<< are logical shifts.
+The reason why we left shift, type cast to int32 and the right shift again is because 2950
+stores the value as a signed 18 bit number with the 17th bit(0 indexing) being the sign bit.
+By left shifting the value by [32 - 18 = 14], and type casting it to an int32, we put the
+17th bit as the 31st bit. Now if we arithmetic right shift by 14, the 31st bit is not shifted
+and it maintains its polarity.
+*/
+#define AMP_CONV(v)					1e-6*((int32_t)((v) << 14)>>14); // Needs to give us Amps.
 
 // old formula (v*0.00015) + 1.5
 /* USER CODE END PD */
@@ -78,6 +88,7 @@ int voltage_loop(void);
 
 void parse_print_cell_measurement(uint8_t* buff);
 void parse_print_gpio_measurement(uint8_t* buff);
+void hex_dump(u8 * buff, int nBytes);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -131,12 +142,15 @@ int main(void)
 
 //	  readSID();
 //	  configBMS();
-	  readCFG();
-	  voltage_loop();
 
 	  readStatErr();
 
-	  HAL_Delay(1000);
+//	  readCFG();
+	  voltage_loop();
+
+
+
+	  HAL_Delay(1500);
 //	  printf("\n\rALIVE \n\r");
     /* USER CODE END WHILE */
 
@@ -391,11 +405,14 @@ static void MX_GPIO_Init(void)
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
-  __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
+  __HAL_RCC_GPIOC_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, GPIO_PIN_RESET);
 
   /*Configure GPIO pins : PB0 PB1 PB2 */
   GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2;
@@ -403,6 +420,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PD12 */
+  GPIO_InitStruct.Pin = GPIO_PIN_12;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
@@ -443,13 +467,18 @@ int voltage_loop(void){
 	printf("\n\rPEC: %d",pollCellVoltage(cellVReg));
 	timeStamp2 = HAL_GetTick() - timeStamp;
 	printf("\n\rCell Mes Time stamp: %lu ",timeStamp2);
+	printf("\n \r CELL VOLTAGE \n\r");
 	parse_print_cell_measurement(cellVReg);
+
+//	hex_dump(cellVReg, 32*TOTAL_IC);
 
 
 	timeStamp = HAL_GetTick();
 	printf("PEC: %d",pollAuxVoltage(auxVReg));
 	printf("\n\rGPIO Time stamp: %lu ", HAL_GetTick() - timeStamp);
-	parse_print_gpio_measurement(auxVReg);
+//	parse_print_gpio_measurement(auxVReg);
+	printf("\n \r AUX VALUES \n\r");
+//	hex_dump(auxVReg, 24*TOTAL_IC);
 
 
 	return 0;
@@ -463,21 +492,41 @@ int voltage_loop(void){
 
 
 // Just printing values for now
+//void parse_print_cell_measurement(uint8_t* buff){
+//	int16_t cell_values[16*TOTAL_IC];
+//	memset(cell_values, 0x0000, 16*TOTAL_IC*sizeof(uint16_t));
+//
+//		FORIN(x, 16*(TOTAL_IC-1)){
+//		float temp = 0.0;
+//		cell_values[x] = buff[2*x]|buff[2*x + 1]<<8; // Not using memcpy because I am not sure about endianness
+//		temp = C_VOLT_CONV(cell_values[x]);
+//
+//		printf("%.02f  ", temp);
+////		printf("%d  ", cell_values[x]);
+//		int __x = (x+1)%8? 0:  printf("\n\r"); // Hacky Prints a new line only every eight values
+//	}
+//	double Val2950[2] = {0, 0};
+//	Val2950[0] = AMP_CONV(buff[36]|buff[37]<<8|buff[38]<<16);
+//	Val2950[1] = AMP_CONV(buff[39]|buff[40]<<8|buff[41]<<16);
+//
+//	printf("\n\r Current Values: %.02lf %.02lf \n\r", Val2950[0], Val2950[1]);
+//
+//
+//}
+
+// Dirty parsing function. ONLY FOR TESTING
+// Final parsing needs to be more intelligent
 void parse_print_cell_measurement(uint8_t* buff){
-	int16_t cell_values[16*TOTAL_IC];
-	memset(cell_values, 0x0000, 16*TOTAL_IC*sizeof(uint16_t));
+	double curr_1 = AMP_CONV(buff[2]<<16|buff[1]<<8|buff[0]);
+	double curr_2 = AMP_CONV(buff[5]<<16|buff[4]<<8|buff[3]);
 
-	printf("\n\rCELL VALUES: \n\r"); // Remove later. Only prints in debug mode.
 
-		FORIN(x, 16*TOTAL_IC){
-		float temp = 0.0;
-		cell_values[x] = buff[2*x]|buff[2*x + 1]<<8; // Not using memcpy because I am not sure about endianness
-		temp = C_VOLT_CONV(cell_values[x]);
+	int16_t cell_0 = buff[6]|buff[7]<<8;
+	int16_t cell_1 = buff[8]|buff[9]<<8;
+	int16_t cell_2 = buff[10]|buff[11]<<8;
 
-		printf("%.02f  ", temp);
-		printf("%d  ", cell_values[x]);
-		int __x = (x+1)%8? 0:  printf("\n\r"); // Hacky Prints a new line only every eight values
-	}
+	printf("\n\r Cell measurements: %.02f %.02f %.02f", C_VOLT_CONV(cell_0), C_VOLT_CONV(cell_1), C_VOLT_CONV(cell_2));
+	printf("\n\r Current measurements: %.06f %.06f \n\r", curr_1/0.00005, curr_2/0.00005);
 
 }
 
@@ -494,6 +543,14 @@ void parse_print_gpio_measurement(uint8_t* buff){
 		int __x = (x+1)%8? 0 : printf("\n\r"); // Hacky// Prints a new line only every eight values
 	}
 
+}
+
+
+void hex_dump(u8 * buff, int nBytes){
+	FORIN(i, nBytes){
+		printf("%02x ", buff[i]);
+		int __x = (i+1)%6? 0 : printf("\n\r"); // Hacky// Prints a new line only every eight values
+	}
 }
 
 /*
@@ -517,6 +574,7 @@ void Error_Handler(void)
   /* USER CODE BEGIN Error_Handler_Debug */
   /* User can add his own implementation to report the HAL error return state */
   __disable_irq();
+  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, GPIO_PIN_SET);
   while (1)
   {
   }

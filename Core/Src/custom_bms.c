@@ -15,14 +15,14 @@
 #include "main.h"
 
 #define RDCALL_SIZE 		34
-#define ONE_REG_SIZE		6
+#define ONE_REG_SIZE		8
 #define RX_SIZE				8
 
-u8 startCellMeasure[2] = {0x02, 0x60}; // Hard coding for now // This should poll adc too actually
+u8 startCellMeasure[2] = {0x03, 0x60}; // Hard coding for now // This should poll adc too actually
 // bit 10: 	0
 // bit 9:  	1
-// bit 8:	0 		// Not using S adc RD bit
-// byte: 0x02		//bit[3:7] have to be zero
+// bit 8:	1 		// Setting the redundant measurement bit
+// byte: 0x03		//bit[3:7] have to be zero
 
 // bit 7:	0 		// Single shot measurement, 1 For continuous
 // bit 6:	1
@@ -52,12 +52,15 @@ u8 startAux2Measurement[2] = {0x04, 0x00}; //
 
 
 
+
+
+
 int configBMS(void){
 	wakeup_chain(TOTAL_IC);
 		/*
 		 * Write config register A. Use WRCFGA.
 		 * Write config register B. Use WRCFGB.
-		 * Data frame structure: 7* (6830config + 2950config). Because Dasiy Chain
+		 * Data frame structure: 2950config + (TOTAL_IC-1)*(6830config)
 		 */
 		uint8_t buff_6830_a[6];
 		uint8_t buff_6830_b[6];
@@ -74,7 +77,7 @@ int configBMS(void){
 		buff_6830_a[2] = 0x00; // Control reg for soak functions. Cleared for now. Will set when soak is understood
 		buff_6830_a[3] = 0xFF; // GPIOs [8:0] are all pulled down.(For ADC measurements)
 		buff_6830_a[4] = 0x03; // GPIOs 10 and 9 are not pulled down.
-		buff_6830_a[5] = 0x00; // bits [2:0] is for filter.
+		buff_6830_a[5] = (0x01<<3); // bits [2:0] is for filter.
 		// We need to set bit 3 in the last byte for the last one in the daisy chain. We'll do it when we create the final buffer that is sent
 
 		buff_6830_b[0] = 0x71; // Under voltage value. Not sure right now
@@ -85,53 +88,71 @@ int configBMS(void){
 		buff_6830_b[4] = 0x00; // DCC to zero. Not sure what to set here
 		buff_6830_b[5] = 0x00; // DCC to zero
 
-		// TODO: Add 2950 config
-		/*
-		 * can't test config for 2950 because we don't know what they do.
-		 */
+		buff_2950_a[0] = 0x80; // Enable overcurrent ADC
+		buff_2950_a[1] = 0;
+		buff_2950_a[2] = 0;
+		buff_2950_a[3] = 0;
+		buff_2950_a[4] = 0;
+		buff_2950_a[5] = 0x10; // Ref enable
 
-		// Put the reg data into the buffer that will be sent
-		for(int x = 0  ; x < TOTAL_IC; x ++){
+		buff_2950_b[0] = 0;
+		buff_2950_b[1] = 0;
+		buff_2950_b[2] = 0;
+		buff_2950_b[3] = 0;
+		buff_2950_b[4] = 0;
+		buff_2950_b[5] = 0;
+		/* ======================= End of config definitiom =============================== */
 
-			//if(x == (TOTAL_IC-1)) buff_6830_a[5] |= 0b1<<3; // COMM_BK flag set for the last chain
-			// The do not set this bit in the example code
+		// Put the reg data into the buffer that will be sent. We're gonna do manually while testing.
+		memcpy(buff_data, buff_2950_a, 6); // Index for 2950 for the segment.
+		memcpy(buff_data+6, buff_6830_a, 6); // Index for 6830 for the segment.
 
-			memcpy(buff_data+(x*6 ), buff_6830_a, 6); // Index for 6830 for the segment.
-	//		memcpy(buff_data+(x*12), buff_2950_a, 6); // Index for 2950 for the segment.
-		}
+		// Change this to a for loop later
 
 		// Final data buffer will have 6*TOTAL_IC bytes for each config register
-		spiWriteData(TOTAL_IC, WRCFGA, buff_6830_a); // Note this function reverses the data buffer while sending.
+		spiWriteData(TOTAL_IC, WRCFGA, buff_data); // Note this function reverses the data buffer while sending.
 
-		for(int x = 0 ; x < TOTAL_IC; x ++){
-			memcpy(buff_data+(x*6), buff_6830_b, 6); // Index for 6830 for the segment.
-	//		memcpy(buff_data+(x*12 + 6), buff_2950_b, 6); // Index for 2950 for the segment.
-		}
+		memcpy(buff_data, buff_2950_b, 6); // Index for 2950 for the segment.
+		memcpy(buff_data+6, buff_2950_b, 6); // Index for 6830 for the segment.
+
+
 		// Final data buffer will have 14*6 bytes for each config register
-		spiWriteData(TOTAL_IC, WRCFGB, buff_6830_b);
-		printf("\n\rWRCFGA: ");
+		spiWriteData(TOTAL_IC, WRCFGB, buff_data);
+
+		/* ============================ Debugging statements ====================================*/
+		printf("\n\r6830 WRCFGA: ");
 		FORIN(_x , 6){
 			printf("%02x ", buff_6830_a[_x]);
 		}
 
-		printf("\n\rWRCFGB: ");
+		printf("\n\r6830 WRCFGB: ");
 		FORIN(_x , 6){
 			printf("%02x ", buff_6830_b[_x]);
 		}
 
+		printf("\n\r2950 WRCFGA: ");
+		FORIN(_x , 6){
+			printf("%02x ", buff_2950_a[_x]);
+		}
+
+		printf("\n\r2950 WRCFGB: ");
+		FORIN(_x , 6){
+			printf("%02x ", buff_2950_b[_x]);
+		}
+
+		/* ============================ End of Debugging statements ==============================*/
 
 		return 0;
 
 
 }
 
-int requestCellVotlage(void){
-	int retval = 0;
-
-	return retval;
-}
-
-/// Making this do everything lowkey
+/* @brief Initiates ADC measurement for all devices in the daisy chain.
+ *
+ * TODO: Switch to reading the status register and reading the values only if any error flags
+ * 		 are set.
+ *
+ */
 int pollCellVoltage(u8* rxdata){
 	int retval = 0;
 	u8 _dumpbyte = 0;
@@ -139,34 +160,32 @@ int pollCellVoltage(u8* rxdata){
 	u8 cmd_cnt[TOTAL_IC];
 	wakeup_chain(TOTAL_IC);
 
-	spiSendCmd(startCellMeasure); // This should
+	spiSendCmd(startCellMeasure);
 	spiCSHigh();
 	spiSendCmd(startCellMeasure);
 	spiCSHigh(); // spiSendCmd pulls CS low before sending. It doesn't pull it back up high so we don't use another function for polling
+	// Sending the command twice works more relibaly without affecting it's function.
+
 	spiSendCmd(PLADC);
+
 	while(_dumpbyte != 0xFF){
 		spi_read(&_dumpbyte, 1);
 	}
 	spiCSHigh();
 
 	FORIN(__j, 1){
-//	spiReadData(TOTAL_IC, RDCVA, rxdata, &pecerr, cmd_cnt, RDCALL_SIZE);
-	spiReadData(TOTAL_IC, RDCVB, rxdata, &pecerr, cmd_cnt, 8);
-	spiReadData(TOTAL_IC, RDCVB, rxdata + 6, &pecerr, cmd_cnt, 8);
-	spiReadData(TOTAL_IC, RDCVC, rxdata + 12, &pecerr, cmd_cnt, 8);
-	spiReadData(TOTAL_IC, RDCVD, rxdata + 18, &pecerr, cmd_cnt, 8);
-	spiReadData(TOTAL_IC, RDCVE, rxdata + 24, &pecerr, cmd_cnt, 8);
-	spiReadData(TOTAL_IC, RDCVF, rxdata + 30, &pecerr, cmd_cnt, 8);
+	// The pointer arithmetic needs to change based on the number of ICs
+	spiReadData(TOTAL_IC, RDCVA, rxdata, &pecerr, cmd_cnt, RX_SIZE);
+	spiReadData(TOTAL_IC, RDCVB, rxdata + (6*TOTAL_IC), &pecerr, cmd_cnt, RX_SIZE); // Pointer maths might be wrong
+	spiReadData(TOTAL_IC, RDCVC, rxdata + (12*TOTAL_IC), &pecerr, cmd_cnt, RX_SIZE);
+	spiReadData(TOTAL_IC, RDCVD, rxdata + (18*TOTAL_IC), &pecerr, cmd_cnt, RX_SIZE);
+	spiReadData(TOTAL_IC, RDCVE, rxdata + (24*TOTAL_IC), &pecerr, cmd_cnt, RX_SIZE);
+	spiReadData(TOTAL_IC, RDCVF, rxdata + (30*TOTAL_IC), &pecerr, cmd_cnt, RX_SIZE);
 	retval = pecerr;
 	}
 	return retval;
 }
 
-int requestAuxVoltage(void){
-	int retval = 0;
-
-	return retval;
-}
 
 int pollAuxVoltage(u8* rxdata){
 	int retval = 0;
@@ -182,7 +201,7 @@ int pollAuxVoltage(u8* rxdata){
 	spiSendCmd(PLAUX2);
 	while(_dumpbyte != 0xFF){
 		spi_read(&_dumpbyte, 1);
-//		printf("Polling\n\r");
+		printf("Polling\n\r");
 	}
 	spiCSHigh();
 
@@ -197,24 +216,25 @@ int pollAuxVoltage(u8* rxdata){
 	return retval;
 }
 
-
+/* @brief Reads all the config registers.
+ * Not needed during normal operation.
+ * Mostly needed for debugging
+ */
 int readCFG(void){
-	u8 cfgBuffer[TOTAL_IC*RX_SIZE];
+	u8 cfgBuffer[TOTAL_IC*6];
 	uint32_t pecerr = 0;
 	u8 cmd_cnt[TOTAL_IC];
 	memset(cfgBuffer, 0x00, TOTAL_IC*RX_SIZE);
 
-
-//	spiReadData(TOTAL_IC, RDCFGA, cfgBuffer, &pecerr, cmd_cnt,  RX_SIZE);
 	wakeup_chain(TOTAL_IC);
-
 
 	spiReadData(TOTAL_IC, RDCFGA, cfgBuffer, &pecerr, cmd_cnt,  RX_SIZE);
 
-	printf("\n\rCFGA: ");
+	printf("\n\rCFGA: \n\r");
 
-	FORIN(i, 6){
+	FORIN(i, TOTAL_IC*6){
 		printf("%02x ", cfgBuffer[i]);
+		int __x = (i+1)%6? 0 : printf("\n\r");
 	}
 	printf("\n\rPEC:%lu", pecerr);
 	memset(cfgBuffer, 0x00, TOTAL_IC*6);
@@ -222,10 +242,11 @@ int readCFG(void){
 
 	spiReadData(TOTAL_IC, RDCFGB, cfgBuffer, &pecerr, cmd_cnt,  RX_SIZE);
 
-	printf("\n\rCFGB: ");
+	printf("\n\rCFGB: \n\r");
 
-	FORIN(i, 6){
+	FORIN(i, TOTAL_IC*6){
 		printf("%02x ", cfgBuffer[i]);
+		int __x = (i+1)%6? 0 : printf("\n\r");
 	}
 	printf("\n\rPEC:%lu", pecerr);
 
@@ -259,11 +280,11 @@ int readStatErr(void){
 	u8 cmd_cnt[TOTAL_IC];
 	memset(statBuffer, 0x00, TOTAL_IC*6);
 
-	spiReadData(TOTAL_IC, RDSTATC, statBuffer, &pecerr, cmd_cnt,  RX_SIZE);
+	spiReadData(TOTAL_IC, RDSTATE, statBuffer, &pecerr, cmd_cnt,  RX_SIZE);
 
 	printf("\n\rSTATERR: ");
 
-	FORIN(i, 6){
+	FORIN(i, TOTAL_IC*6){
 			printf("%02x ", statBuffer[i]);
 		}
 
