@@ -28,6 +28,7 @@ extern "C" {
 
 /* Includes ------------------------------------------------------------------*/
 #include "stm32f4xx_hal.h"
+#include "cmsis_os.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -38,6 +39,12 @@ extern "C" {
 /* USER CODE BEGIN ET */
 extern TIM_HandleTypeDef htim2;
 extern SPI_HandleTypeDef hspi1;
+
+extern osMutexId_t oCANMutex;
+extern osMessageQueueId_t oBMSErrorMsgQueue;
+extern osMessageQueueId_t oBMSCANMsgQueue;
+
+
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/
