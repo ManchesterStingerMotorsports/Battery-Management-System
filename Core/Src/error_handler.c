@@ -10,6 +10,7 @@
 // INCLUDES
 #include "cmsis_os.h"
 #include <stdint.h>
+#include <string.h>
 
 //DEFINES
 #define BMS_ID 				0x24
@@ -42,11 +43,11 @@ int init_error_handler(void){
 
 	// Create message queue for error messages
 	oBMSErrorMsgQueue = osMessageQueueNew(ERROR_QUEUE_SIZE, sizeof(fs_bms_error_msg), NULL);
-	if(oBMSErrorMsgQueue == NULL) return FAIL;
+	if(oBMSErrorMsgQueue == NULL) return ERROR;
 
 	// Create error handler task
 	bmsErrorTaskHandle = osThreadNew(bms_error_handler_task, NULL, &bmsErrorTask_attributes);
-	if(bmsErrorTaskHandle == NULL) return FAIL;
+	if(bmsErrorTaskHandle == NULL) return ERROR;
 
 	return SUCCESS;
 }

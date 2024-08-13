@@ -45,7 +45,7 @@ typedef struct _error_message{
 
 /*----------------------FUNCTION PROTOTYPES-------------------------------*/
 
-void init_error_handler(void);
+int init_error_handler(void);
 
 void bms_error_handler_task(void*);
 
