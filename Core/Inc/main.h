@@ -31,18 +31,29 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#define TOTAL_IC 			2
+#include "cmsis_os2.h"
+
+
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
 extern TIM_HandleTypeDef htim2;
 extern SPI_HandleTypeDef hspi1;
+extern UART_HandleTypeDef huart2;
 
-extern osMutexId_t oCANMutex;
-extern osMessageQueueId_t oBMSErrorMsgQueue;
-extern osMessageQueueId_t oBMSCANMsgQueue;
+extern osMessageQueueId_t canTxQueueHandle;
+extern osMutexId_t mutex_uart2Handle;
 
+//extern osMutexId_t oCANMutex;
+//extern osMessageQueueId_t oBMSErrorMsgQueue;
+//extern osMessageQueueId_t oBMSCANMsgQueue;
+
+typedef struct
+{
+    CAN_TxHeaderTypeDef header;
+    uint8_t data[8];
+} CAN_msg_s;
 
 /* USER CODE END ET */
 
@@ -66,7 +77,7 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 
 /* USER CODE BEGIN Private defines */
-
+#define TOTAL_IC            2
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

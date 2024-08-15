@@ -90,6 +90,9 @@ const osThreadAttr_t errorHandler_attributes = {
 /* Definitions for canTxQueue */
 osMessageQueueId_t canTxQueueHandle;
 const osMessageQueueAttr_t canTxQueue_attributes = {.name = "canTxQueue"};
+/* Definitions for mutex_uart2 */
+osMutexId_t mutex_uart2Handle;
+const osMutexAttr_t mutex_uart2_attributes = {.name = "mutex_uart2"};
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -104,12 +107,13 @@ static void MX_UART5_Init(void);
 static void MX_USART2_UART_Init(void);
 void startIsoSPIcomm(void *argument);
 void startCanHandler(void *argument);
-void startErrorHandler(void *argument);
+extern void startErrorHandler(void *argument);
 
 /* USER CODE BEGIN PFP */
 int __io_putchar(int ch); // Printf works on uart4. Usart1 pins are used for something else on DISCO Board
 
 int current_loop(void);
+
 int voltage_loop(void);
 
 void parse_print_cell_measurement(uint8_t *buff);
@@ -161,6 +165,9 @@ int main(void)
 
     /* Init scheduler */
     osKernelInitialize();
+    /* Create the mutex(es) */
+    /* creation of mutex_uart2 */
+    mutex_uart2Handle = osMutexNew(&mutex_uart2_attributes);
 
     /* USER CODE BEGIN RTOS_MUTEX */
     /* add mutexes, ... */
@@ -176,8 +183,7 @@ int main(void)
 
     /* Create the queue(s) */
     /* creation of canTxQueue */
-    canTxQueueHandle = osMessageQueueNew(16, sizeof(uint16_t),
-                                         &canTxQueue_attributes);
+    canTxQueueHandle = osMessageQueueNew(16, sizeof(CAN_msg_s), &canTxQueue_attributes);
 
     /* USER CODE BEGIN RTOS_QUEUES */
     /* add queues, ... */
@@ -185,22 +191,16 @@ int main(void)
 
     /* Create the thread(s) */
     /* creation of isoSPIcomm */
-    isoSPIcommHandle = osThreadNew(startIsoSPIcomm, NULL,
-                                   &isoSPIcomm_attributes);
+    isoSPIcommHandle = osThreadNew(startIsoSPIcomm, NULL, &isoSPIcomm_attributes);
 
     /* creation of canHandler */
-    canHandlerHandle = osThreadNew(startCanHandler, NULL,
-                                   &canHandler_attributes);
+    canHandlerHandle = osThreadNew(startCanHandler, NULL, &canHandler_attributes);
 
     /* creation of errorHandler */
-    errorHandlerHandle = osThreadNew(startErrorHandler, NULL,
-                                     &errorHandler_attributes);
+    errorHandlerHandle = osThreadNew(startErrorHandler, NULL, &errorHandler_attributes);
 
     /* USER CODE BEGIN RTOS_THREADS */
     /* add threads, ... */
-    if (init_error_handler())
-        Error_Handler();
-
     /* USER CODE END RTOS_THREADS */
 
     /* USER CODE BEGIN RTOS_EVENTS */
@@ -251,13 +251,12 @@ void SystemClock_Config(void)
     /** Initializes the RCC Oscillators according to the specified parameters
      * in the RCC_OscInitTypeDef structure.
      */
-    RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
-    RCC_OscInitStruct.HSIState = RCC_HSI_ON;
-    RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
+    RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+    RCC_OscInitStruct.HSEState = RCC_HSE_ON;
     RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-    RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
+    RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
     RCC_OscInitStruct.PLL.PLLM = 8;
-    RCC_OscInitStruct.PLL.PLLN = 64;
+    RCC_OscInitStruct.PLL.PLLN = 336;
     RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
     RCC_OscInitStruct.PLL.PLLQ = 4;
     if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
@@ -267,14 +266,14 @@ void SystemClock_Config(void)
 
     /** Initializes the CPU, AHB and APB buses clocks
      */
-    RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK
-            | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
+    RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_PCLK1
+            | RCC_CLOCKTYPE_PCLK2;
     RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
     RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-    RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
-    RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV16;
+    RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;
+    RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
 
-    if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
+    if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5) != HAL_OK)
     {
         Error_Handler();
     }
@@ -296,11 +295,11 @@ static void MX_CAN1_Init(void)
 
     /* USER CODE END CAN1_Init 1 */
     hcan1.Instance = CAN1;
-    hcan1.Init.Prescaler = 16;
+    hcan1.Init.Prescaler = 6;
     hcan1.Init.Mode = CAN_MODE_NORMAL;
     hcan1.Init.SyncJumpWidth = CAN_SJW_1TQ;
-    hcan1.Init.TimeSeg1 = CAN_BS1_1TQ;
-    hcan1.Init.TimeSeg2 = CAN_BS2_1TQ;
+    hcan1.Init.TimeSeg1 = CAN_BS1_11TQ;
+    hcan1.Init.TimeSeg2 = CAN_BS2_2TQ;
     hcan1.Init.TimeTriggeredMode = DISABLE;
     hcan1.Init.AutoBusOff = DISABLE;
     hcan1.Init.AutoWakeUp = DISABLE;
@@ -340,7 +339,7 @@ static void MX_SPI1_Init(void)
     hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
     hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
     hspi1.Init.NSS = SPI_NSS_SOFT;
-    hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+    hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_32;
     hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
     hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
     hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -478,14 +477,14 @@ static void MX_GPIO_Init(void)
     /* USER CODE END MX_GPIO_Init_1 */
 
     /* GPIO Ports Clock Enable */
+    __HAL_RCC_GPIOC_CLK_ENABLE();
+    __HAL_RCC_GPIOH_CLK_ENABLE();
     __HAL_RCC_GPIOA_CLK_ENABLE();
     __HAL_RCC_GPIOB_CLK_ENABLE();
     __HAL_RCC_GPIOD_CLK_ENABLE();
-    __HAL_RCC_GPIOC_CLK_ENABLE();
 
     /*Configure GPIO pin Output Level */
-    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0 | GPIO_PIN_1 | GPIO_PIN_2,
-                      GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0 | GPIO_PIN_1 | GPIO_PIN_2, GPIO_PIN_RESET);
 
     /*Configure GPIO pin Output Level */
     HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, GPIO_PIN_RESET);
@@ -530,7 +529,7 @@ int voltage_loop(void)
 {
 //	wakeup_chain(TOTAL_IC);
     u8 cellVReg[32 * TOTAL_IC];		//RDCVALL Size .. Just padding
-    u8 auxVReg[24 * TOTAL_IC];			// Total Aux2 reg size + 2 for padding
+    u8 auxVReg[24 * TOTAL_IC];		// Total Aux2 reg size + 2 for padding
     memset(cellVReg, 0x00, 32 * TOTAL_IC);
     memset(auxVReg, 0x00, 24 * TOTAL_IC);
     uint32_t timeStamp = 0;
@@ -600,10 +599,9 @@ void parse_print_cell_measurement(uint8_t *buff)
     int16_t cell_1 = buff[8] | buff[9] << 8;
     int16_t cell_2 = buff[10] | buff[11] << 8;
 
-    printf("\n\r Cell measurements: %.02f %.02f %.02f", C_VOLT_CONV(cell_0),
-           C_VOLT_CONV(cell_1), C_VOLT_CONV(cell_2));
-    printf("\n\r Current measurements: %.06f %.06f \n\r", curr_1 / 0.00005,
-           curr_2 / 0.00005);
+    printf("\n\r Cell measurements: %.02f %.02f %.02f", C_VOLT_CONV(cell_0), C_VOLT_CONV(cell_1),
+           C_VOLT_CONV(cell_2));
+    printf("\n\r Current measurements: %.06f %.06f \n\r", curr_1 / 0.00005, curr_2 / 0.00005);
 
 }
 
@@ -619,7 +617,7 @@ void parse_print_gpio_measurement(uint8_t *buff)
 
         printf("%.02f  ", temp);
         printf("%d  ", gpio_values[x]);
-        int __x = (x + 1) % 8 ? 0 : printf("\n\r"); // Hacky// Prints a new line only every eight values
+        (void) ((x + 1) % 8 ? 0 : printf("\n\r")); // Hacky// Prints a new line only every eight values
     }
 
 }
@@ -629,7 +627,7 @@ void hex_dump(u8 *buff, int nBytes)
     FORIN(i, nBytes)
     {
         printf("%02x ", buff[i]);
-        int __x = (i + 1) % 6 ? 0 : printf("\n\r"); // Hacky// Prints a new line only every eight values
+        (void) ((i + 1) % 8 ? 0 : printf("\n\r")); // Hacky// Prints a new line only every eight values
     }
 }
 
@@ -648,8 +646,8 @@ int __io_putchar(int ch)
 
 /* USER CODE BEGIN Header_startIsoSPIcomm */
 /**
- * @brief Function implementing the isoSPIcomm thread.
- * @param argument: Not used
+ * @brief  Function implementing the isoSPIcomm thread.
+ * @param  argument: Not used
  * @retval None
  */
 /* USER CODE END Header_startIsoSPIcomm */
@@ -674,30 +672,70 @@ void startIsoSPIcomm(void *argument)
 void startCanHandler(void *argument)
 {
     /* USER CODE BEGIN startCanHandler */
-    /* Infinite loop */
-    for (;;)
-    {
-        osDelay(1);
-    }
-    /* USER CODE END startCanHandler */
-}
 
-/* USER CODE BEGIN Header_startErrorHandler */
-/**
- * @brief Function implementing the errorHandler thread.
- * @param argument: Not used
- * @retval None
- */
-/* USER CODE END Header_startErrorHandler */
-void startErrorHandler(void *argument)
-{
-    /* USER CODE BEGIN startErrorHandler */
+    // This filter allows for all message to pass
+    // Rx FIFO0 is used
+    CAN_FilterTypeDef sf;
+    sf.FilterIdHigh = 0x0000;
+    sf.FilterIdLow = 0x0000;
+    sf.FilterMaskIdHigh = 0x0000;
+    sf.FilterMaskIdLow = 0x0000;
+    sf.FilterFIFOAssignment = CAN_FILTER_FIFO0;
+    sf.FilterBank = 0;
+    sf.FilterMode = CAN_FILTERMODE_IDMASK;
+    sf.FilterScale = CAN_FILTERSCALE_32BIT;
+    sf.FilterActivation = CAN_FILTER_ENABLE;
+
+    if (HAL_CAN_ConfigFilter(&hcan1, &sf) != HAL_OK)
+    {
+        Error_Handler();
+    }
+
+    if (HAL_CAN_Start(&hcan1) != HAL_OK)
+    {
+        Error_Handler();
+    }
+
+    // Enable Interrupt callback when a CAN message is recieved
+    if (HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING) != HAL_OK)
+    {
+        Error_Handler();
+    }
+
+    CAN_msg_s canMsg;
+
     /* Infinite loop */
     for (;;)
     {
-        osDelay(1);
+        if (osMessageQueueGet(canTxQueueHandle, &canMsg, NULL, 0) == osOK)
+        {
+            // Check for empty TxMailbox (3 Tx Mailbox per CAN)
+            if (HAL_CAN_GetTxMailboxesFreeLevel(&hcan1))
+            {
+                uint32_t mb;                // Stores which Tx Mailbox is used
+
+                if (HAL_CAN_AddTxMessage(&hcan1, &(canMsg.header), canMsg.data, &mb) != HAL_OK)
+                {
+                    Error_Handler();
+                }
+            }
+            else
+            {
+                // CAN BUSY (TxMailbox is full)
+                HAL_UART_Transmit(&huart2, (uint8_t*) "TxFull\n", 7,
+                HAL_MAX_DELAY);
+            }
+        }
+        else
+        {
+            HAL_UART_Transmit(&huart2, (uint8_t*) "QueueError\n", 11,
+            HAL_MAX_DELAY);
+        }
+
+        osDelay(50); // Transmit can every 50 ms - Faster rate might cause txMailbox overflow
     }
-    /* USER CODE END startErrorHandler */
+
+    /* USER CODE END startCanHandler */
 }
 
 /**

@@ -224,7 +224,7 @@ int readCFG(void){
 	u8 cfgBuffer[TOTAL_IC*6];
 	uint32_t pecerr = 0;
 	u8 cmd_cnt[TOTAL_IC];
-	memset(cfgBuffer, 0x00, TOTAL_IC*RX_SIZE);
+	memset(cfgBuffer, 0x00, TOTAL_IC*RX_SIZE); // TODO: Warning - 'memset' writing 16 bytes into a region of size 12 overflows the destination [-Wstringop-overflow=]
 
 	wakeup_chain(TOTAL_IC);
 
@@ -234,7 +234,7 @@ int readCFG(void){
 
 	FORIN(i, TOTAL_IC*6){
 		printf("%02x ", cfgBuffer[i]);
-		int __x = (i+1)%6? 0 : printf("\n\r");
+		(void)((i+1) % 6 ? 0 : printf("\n\r"));
 	}
 	printf("\n\rPEC:%lu", pecerr);
 	memset(cfgBuffer, 0x00, TOTAL_IC*6);
@@ -246,7 +246,7 @@ int readCFG(void){
 
 	FORIN(i, TOTAL_IC*6){
 		printf("%02x ", cfgBuffer[i]);
-		int __x = (i+1)%6? 0 : printf("\n\r");
+		(void)((i+1) % 6 ? 0 : printf("\n\r"));
 	}
 	printf("\n\rPEC:%lu", pecerr);
 
