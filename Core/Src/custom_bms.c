@@ -53,6 +53,59 @@ u8 startAux2Measurement[2] = {0x04, 0x00}; //
 
 
 
+// @brief Parses the status register. The return value only contains the number of flags set. This function
+// 		  loses information about which cell set the flag. Since the BMS cannot isolate or cutt off cells,
+// 		  knowing which cell set a flag is not very useful.
+// @param argStatReg Pointer to the array containing all measured status registers.
+// @param statRegsize	Number of byte in the array
+// @param errFlagBuff User defined buffer to store positional data of error flags.
+// @param errFlagBUffSize Size of errFlagBuff
+// @return Returns the number of flags set.Returns -1 if buffer sizes are not appropriate.
+int _parseStatusRegister(uint8_t * argStatReg, size_t statRegsize, statErr_t * errFlagBuff, size_t errFlagBuffSize){
+	uint16_t retValHigh = 0;
+	uint16_t retValLow = 0;
+	uint8_t icNum = 0;
+	uint8_t retVal = 0;
+
+	if((statRegsize%6) || (errFlagBuffSize*6 != statRegsize)) return -1;
+
+	// TODO: Check if ADBMS 2950 has the same position for flags in the status register
+	for(int i = 0; i < size; i ++){ // Iterating through all the registers.
+		if(i%4 || i%5){ // Only check every 4th and 5th register.
+			for(int x = 0; x < 4; x ++){
+				uint8_t checkVal = (argStatReg[i]>>(x*2) & 0b11) ; // Magic equation extracts high and low bits for a cell
+				// Checking two bits at a time.
+				// Bit 0 => UnderVoltage
+				// Bit 1 => OverVoltage
+				switch(checkVal){
+				case 1:
+					retValLow += 1; // Counts OverVoltage bits
+					retVal += 1;
+					break;
+				case 2:
+					retValHigh += 1; // Counts UnderVoltage bits
+					retVal += 1;
+					break;
+				default:
+					break;
+				} // End switch statement
+			} // End for loop
+		} // End if statement
+		else if (!(i%6) && !i) { // i is a multiple of 6 and i is not 0
+			errFlagBuff[icNum] =(uint32_t)(retValHigh<<16|retValLow);
+			icNum ++; // Increment the index of IC being tracked.
+			retValHigh = 0;
+			retValLow = 0;
+		}
+		else{
+			pass;
+		}
+	}
+	// I think it should record positional information. That way, we won't need to measure all cells
+	// to see which one set the flag. I'm not sure how I would go about doing tha without using a
+	// significant amount of memory.
+	return retVal; // Techincally, this can work for 16^2 cells.
+}
 
 
 int configBMS(void){
@@ -274,21 +327,26 @@ int readSID(void){
 	return 0;
 }
 
-int readStatErr(void){
-	u8 statBuffer[TOTAL_IC*6];
+
+/// @brief Read status registers to check if any edge cases exist.
+/// @param readBuffer Pointer to array where you want all the status registers to be stored.
+///		   Must be equal to 6*Number of ADBMS ICs.
+/// @return 2 if communication fails, 1 if errors exist, 0 if no errors
+int readStatErr(u8 * readBuffer, size_t size, statErr_t * errFlagBuff, size_t errBuffSize){
+
 	uint32_t pecerr = 0;
-	u8 cmd_cnt[TOTAL_IC];
-	memset(statBuffer, 0x00, TOTAL_IC*6);
+	u8 cmd_cnt[size/6]; // I want to get rid of this eventually.
 
-	spiReadData(TOTAL_IC, RDSTATE, statBuffer, &pecerr, cmd_cnt,  RX_SIZE);
+	spiReadData(TOTAL_IC, RDSTATD, statBuffer, &pecerr, cmd_cnt,  RX_SIZE);
 
-	printf("\n\rSTATERR: ");
-
-	FORIN(i, TOTAL_IC*6){
-			printf("%02x ", statBuffer[i]);
+//	printf("\n\rSTATERR: ");
+	if(0 != pecerr){ // Communication failed. This should just retrigger communcation.
+		uint8_t tryCount = 1; // lol
+		while(pecerr && (tryCount < 10)){ // TODO: Make this configuratble later.
+			spiReadData(TOTAL_IC, RDSTATD, statBuffer, &pecerr, cmd_cnt,  RX_SIZE);
 		}
-
-	printf("\n\rPEC:%lu", pecerr);
+	}
+	if(_parseStatusRegister(readBuffer, size, errFlagBuff, errBuffSize))return 1; // Some flags are set.
 
 	return 0;
 }

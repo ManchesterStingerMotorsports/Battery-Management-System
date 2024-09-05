@@ -11,6 +11,8 @@
 #include "main.h"
 #include "mcu_wrapper.h"
 
+#define statErr_t 	uint32_t // Just didn't want it to be the same signature.
+
 
 int configBMS(void);
 

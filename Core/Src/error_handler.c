@@ -10,9 +10,10 @@
 // INCLUDES
 #include "cmsis_os.h"
 #include <stdint.h>
+#include <string.h>
 
 //DEFINES
-#define BMS_ID 				0x24
+#define BMS_ID 				0x60
 #define ERROR_QUEUE_SIZE 	10
 
 //EXTERN VARIABLES
@@ -42,13 +43,13 @@ int init_error_handler(void){
 
 	// Create message queue for error messages
 	oBMSErrorMsgQueue = osMessageQueueNew(ERROR_QUEUE_SIZE, sizeof(fs_bms_error_msg), NULL);
-	if(oBMSErrorMsgQueue == NULL) return FAIL;
+	if(oBMSErrorMsgQueue == NULL) return 1;
 
 	// Create error handler task
 	bmsErrorTaskHandle = osThreadNew(bms_error_handler_task, NULL, &bmsErrorTask_attributes);
-	if(bmsErrorTaskHandle == NULL) return FAIL;
+	if(bmsErrorTaskHandle == NULL) return 1;
 
-	return SUCCESS;
+	return 0;
 }
 
 void bms_error_handler_task(void*){
@@ -71,8 +72,8 @@ void bms_error_handler_task(void*){
 		if(bmsErrorState){
 		// Add OS Timers later so it doesn't just send it
 			if(osMutexAcquire(oCANMutex, osWaitForever) == osOK){
-				memcpy(canErrorMessage + 4, &bmsErrorState, 4);
-				send_CAN_buffer(ECU_ID, canErrorMessage);
+				memcpy(bmsCANErrorMsg + 4, &bmsErrorState, 4);
+//				send_CAN_buffer(BMS_ID, bmsCANErrorMsg); // ADD LATER
 
 				osMutexRelease(oCANMutex); // RELEASE THE MUTEX. IT BLOCKS ALL CAN IF YOU DON'T
 				osDelay(1000); // If errors exist, they only get transmitted once every second
