@@ -83,6 +83,12 @@ void bms_error_handler_task(void*){
 
 }
 
+osStatus_t post_error_message(fs_bms_error_msg * errorToPost){
+
+	return osMessageQueuePut(bmsErrorTaskHandle, errorToPost, 1, 10);
+
+}
+
 void set_error(enum fs_bms_error_t err_num){
 	bmsErrorState |= (1<<(int)err_num);
 }

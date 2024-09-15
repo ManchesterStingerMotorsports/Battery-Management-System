@@ -36,7 +36,7 @@ int init_can_request_handler(void){
 	CHECK_NULL(canReqEventId);
 
 
-	canReqHandlerId = osThreadNew(can_request_handler_task, NULL, canReqHandlerAttr);
+	canReqHandlerId = osThreadNew(can_request_handler_task, NULL, &canReqHandlerAttr);
 	CHECK_NULL(canReqHandlerId);
 
 	return 0;

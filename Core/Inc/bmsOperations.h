@@ -20,10 +20,13 @@
 /*-----------------STRUCTS------------------*/
 /*-----------FUNCITON PROTOTYPES------------*/
 
-int initBMSOps(void);
+int init_bms_ops(int);
 
+
+/// @brief Sets the time between two status register reads.
 int setInterval(unsigned int);
 
+///
 unsigned int getInterval(void);
 
 

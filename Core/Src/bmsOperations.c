@@ -19,13 +19,17 @@
 
 /*-----------------DEFINES------------------*/
 
+#define EPSILON						0.02f
+#define TEMP_THRESH					1000  // TODO: Change later. Make configurable too
+
+
 /*------------EXTERN VARIABLES--------------*/
 /*-------------LOCAL VARIABLES--------------*/
 
 unsigned int sampleInterval = 0;
 
-uint8_t cellVoltageRegs[64];
-uint8_t cellTempRegs[64];
+//uint8_t cellVoltageRegs[64];
+//uint8_t cellTempRegs[64];
 
 
 osThreadId_t bmsMainTask;
@@ -45,78 +49,66 @@ void _parse_print_gpio_measurement(uint8_t* buff);
 void _hex_dump(u8 * buff, int nBytes);
 
 /*----------------FUNCITONS-----------------*/
-int initBMSOps(int nICs){
+
+///
+void _bmsMainTaskFunc(void * args){
+	int counter = 0;
+	uint8_t storeStatRegs[REG_SIZE_BYTES];
+	statErr_t statusFlags[TOTAL_IC];
+	uint16_t cellVoltages[nCELLS];
+	uint16_t cellTemperatures[nTEMPS];
+	fs_bms_error_msg batteryErrors;
+	int returnVals;
+
+	uint32_t tickOne, tickTwo, passedTime;
+	uint32_t tickFreq = osKernelGetTickFreq();
+	configBMS(); // TODO: Fix this first.
+	for(;;){
+
+		returnVals = readStatErr(storeStatRegs, REG_SIZE_BYTES, statusFlags, TOTAL_IC); // FINAL IMPLEMENTATION DONE
+
+		batteryErrors.error_type = returnVals;
+
+		if(returnVals){
+			// Keep trying to post error message.
+			while(post_error_message(&batteryErrors) != osOK);
+		}
+		returnVals = 0;
+		if(counter >= 10){ // TODO: Make configurable
+			pollCellVoltage(cellVoltages); // Size is decided at compile time
+			pollAuxVoltage(cellTemperatures);
+		}
+
+		for(int x = 0; x < nTEMPS; x++){
+			returnVals += ( cellTemperatures[x] >  TEMP_THRESH ) ? 1 : 0 ; // Counts how many values are above threshold
+		}
+
+		if(returnVals){
+			batteryErrors.error_val = returnVals;
+			batteryErrors.error_type = HIGH_TEMP;
+			while(post_error_message(&batteryErrors) != osOK); // High temp error posting
+		}
+		// Report findings
+		tickOne = osKernelGetTickCount();
+		osThreadYield(); // I think this lets other tasks run?
+		tickTwo = osKernelGetTickCount();
+		passedTime = (tickOne - tickTwo)*(1000/tickFreq);
+
+		// This is an attempt to ensure that the battery is checked consistently.
+		passedTime>=100? osDelay(1) : osDelay(100 - passedTime);
+		// 100 - elapsed_ms = 100 - (endTime - startTime)*(1000/osKernelGetTickFrequency)
+	}
+}
+
+int init_bms_ops(int nICs){
 
 
-	bmsMainTask = osThreadNew(bmsMainTaskFunc, NULL, bmsMainTaskAttr);
+	bmsMainTask = osThreadNew(_bmsMainTaskFunc, NULL, &bmsMainTaskAttr);
 
 	if(bmsMainTask == NULL) return 1;
 
 	return 0;
 }
-
-
-// @brief Parses the status register. The return value only contains the number of flags set. This function
-// 		  loses information about which cell set the flag. Since the BMS cannot isolate or cutt off cells,
-// 		  knowing which cell set a flag is not very useful.
-// @param argStatReg Pointer to the array containing all measured status registers.
-// @param size	Number of byte in the array
-// @return Returns a uint32_t value where the top 16 bits contain number of overvoltage flags set, and
-//		   and the bottom 16 bits contain the number of undervoltage flags set.
-unsigned int _parseStatusRegister(uint8_t * argStatReg, size_t size){
-	uint16_t retValHigh = 0;
-	uint16_t retValLow = 0;
-	// TODO: Check if ADBMS 2950 has the same position for flags in the status register
-	for(int i = 0; i < size; i ++){ // Iterating through all the registers.
-		if(i%4 || i%5){ // Only check every 4th and 5th register.
-			for(int x = 0; x < 4; x ++){
-				uint8_t checkVal = (argStatReg[i]>>(x*2) & 0b11) ; // Magic equation extracts high and low bits for a cell
-				// Checking two bits at a time.
-				// Bit 0 => UnderVoltage
-				// Bit 1 => OverVoltage
-				switch(checkVal){
-				case 1:
-					retValLow += 1; // Counts OverVoltage bits
-					break;
-				case 2:
-					retValHigh += 1; // Counts UnderVoltage bits
-					break;
-				default:
-					break;
-				} // End switch statement
-			} // End for loop
-		} // End if statement
-		else{
-			pass;
-		}
-	}
-	// I think it should record positional information. That way, we won't need to measure all cells
-	// to see which one set the flag. I'm not sure how I would go about doing tha without using a
-	// significant amount of memory.
-	return (retValHigh<<16|retValLow); // Techincally, this can work for 16^2 cells.
-}
-
-
-void bmsMainTaskFunc(void * args){
-	int counter = 0;
-	configBMS();
-	for(;;){
-
-		if(1 == readStatErr()){
-			counter == 10; // Force read cellVoltages.This is lossy.
-		}
-		if(counter >= 10){
-			pollCellVoltage(cellVoltageRegs);
-			pollAuxVoltage(cellTempRegs);
-		}
-
-
-		// Report findings
-		osThreadYield(); // I think this lets other tasks run?
-		osDelay(100);
-	}
-}
-
 
 int inline setInterval(unsigned int argInterval){
 	sampleInterval = argInterval;

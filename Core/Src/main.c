@@ -103,9 +103,9 @@ int __io_putchar(int ch); // Printf works on uart4. Usart1 pins are used for som
 int current_loop(void);
 int voltage_loop(void);
 
-void parse_print_cell_measurement(uint8_t* buff);
-void parse_print_gpio_measurement(uint8_t* buff);
-void hex_dump(u8 * buff, int nBytes);
+//void parse_print_cell_measurement(uint8_t* buff);
+//void parse_print_gpio_measurement(uint8_t* buff);
+//void hex_dump(u8 * buff, int nBytes);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -197,14 +197,14 @@ int main(void)
 //	  readSID();
 //	  configBMS();
 
-	  readStatErr();
+//	  readStatErr();
 
 //	  readCFG();
-	  voltage_loop();
+//	  voltage_loop();
 
 
 
-	  HAL_Delay(1500);
+//	  HAL_Delay(1500);
 //	  printf("\n\rALIVE \n\r");
     /* USER CODE END WHILE */
 
@@ -502,41 +502,64 @@ int can_loop(void){
 	return 0;
 }
 
-int voltage_loop(void){
-//	wakeup_chain(TOTAL_IC);
-	u8 cellVReg[32 * TOTAL_IC];		//RDCVALL Size .. Just padding
-	u8 auxVReg[24 * TOTAL_IC];			// Total Aux2 reg size + 2 for padding
-	memset(cellVReg, 0x00, 32 * TOTAL_IC);
-	memset(auxVReg, 0x00, 24 * TOTAL_IC);
-	uint32_t timeStamp = 0;
-	uint32_t timeStamp2 = 0;
+//int voltage_loop(void){
+////	wakeup_chain(TOTAL_IC);
+//	u8 cellVReg[32 * TOTAL_IC];		//RDCVALL Size .. Just padding
+//	u8 auxVReg[24 * TOTAL_IC];			// Total Aux2 reg size + 2 for padding
+//	memset(cellVReg, 0x00, 32 * TOTAL_IC);
+//	memset(auxVReg, 0x00, 24 * TOTAL_IC);
+//	uint32_t timeStamp = 0;
+//	uint32_t timeStamp2 = 0;
+//
+//	/*
+//	 * Tasks:
+//	 * 1. Measure cell voltages
+//	 * 2. Measure cell temperatures
+//	 */
+//
+//	timeStamp = HAL_GetTick();
+//	printf("\n\rPEC: %d",pollCellVoltage(cellVReg));
+//	timeStamp2 = HAL_GetTick() - timeStamp;
+//	printf("\n\rCell Mes Time stamp: %lu ",timeStamp2);
+//	printf("\n \r CELL VOLTAGE \n\r");
+//	parse_print_cell_measurement(cellVReg);
+//
+////	hex_dump(cellVReg, 32*TOTAL_IC);
+//
+//
+//	timeStamp = HAL_GetTick();
+//	printf("PEC: %d",pollAuxVoltage(auxVReg));
+//	printf("\n\rGPIO Time stamp: %lu ", HAL_GetTick() - timeStamp);
+////	parse_print_gpio_measurement(auxVReg);
+//	printf("\n \r AUX VALUES \n\r");
+////	hex_dump(auxVReg, 24*TOTAL_IC);
+//
+//
+//	return 0;
+//}
 
-	/*
-	 * Tasks:
-	 * 1. Measure cell voltages
-	 * 2. Measure cell temperatures
-	 */
+//void parse_print_cell_measurement(uint8_t* buff){
+//	int16_t cell_values[16*TOTAL_IC];
+//	memset(cell_values, 0x0000, 16*TOTAL_IC*sizeof(uint16_t));
+//
+//		FORIN(x, 16*(TOTAL_IC-1)){ // Why is it like this
+//		float temp = 0.0;
+//		cell_values[x] = buff[2*x]|buff[2*x + 1]<<8; // Not using memcpy because I am not sure about endianness
+//		temp = C_VOLT_CONV(cell_values[x]);
+//
+//		printf("%.02f  ", temp);
+////		printf("%d  ", cell_values[x]);
+//		int __x = (x+1)%8? 0:  printf("\n\r"); // Hacky Prints a new line only every eight values
+//	}
+//	double Val2950[2] = {0, 0};
+//	Val2950[0] = AMP_CONV(buff[36]|buff[37]<<8|buff[38]<<16);
+//	Val2950[1] = AMP_CONV(buff[39]|buff[40]<<8|buff[41]<<16);
+//
+//	printf("\n\r Current Values: %.02lf %.02lf \n\r", Val2950[0], Val2950[1]);
+//
+//
+//}
 
-	timeStamp = HAL_GetTick();
-	printf("\n\rPEC: %d",pollCellVoltage(cellVReg));
-	timeStamp2 = HAL_GetTick() - timeStamp;
-	printf("\n\rCell Mes Time stamp: %lu ",timeStamp2);
-	printf("\n \r CELL VOLTAGE \n\r");
-	parse_print_cell_measurement(cellVReg);
-
-//	hex_dump(cellVReg, 32*TOTAL_IC);
-
-
-	timeStamp = HAL_GetTick();
-	printf("PEC: %d",pollAuxVoltage(auxVReg));
-	printf("\n\rGPIO Time stamp: %lu ", HAL_GetTick() - timeStamp);
-//	parse_print_gpio_measurement(auxVReg);
-	printf("\n \r AUX VALUES \n\r");
-//	hex_dump(auxVReg, 24*TOTAL_IC);
-
-
-	return 0;
-}
 
 /*
  * @brief Sends config data at startup
@@ -550,7 +573,7 @@ int voltage_loop(void){
 //	int16_t cell_values[16*TOTAL_IC];
 //	memset(cell_values, 0x0000, 16*TOTAL_IC*sizeof(uint16_t));
 //
-//		FORIN(x, 16*(TOTAL_IC-1)){
+//		FORIN(x, 16*(TOTAL_IC-1)){ // Why is it like this
 //		float temp = 0.0;
 //		cell_values[x] = buff[2*x]|buff[2*x + 1]<<8; // Not using memcpy because I am not sure about endianness
 //		temp = C_VOLT_CONV(cell_values[x]);
@@ -570,42 +593,42 @@ int voltage_loop(void){
 
 // Dirty parsing function. ONLY FOR TESTING
 // Final parsing needs to be more intelligent
-void parse_print_cell_measurement(uint8_t* buff){
-	double curr_1 = AMP_CONV(buff[2]<<16|buff[1]<<8|buff[0]);
-	double curr_2 = AMP_CONV(buff[5]<<16|buff[4]<<8|buff[3]);
+//void parse_print_cell_measurement(uint8_t* buff){
+//	double curr_1 = AMP_CONV(buff[2]<<16|buff[1]<<8|buff[0]);
+//	double curr_2 = AMP_CONV(buff[5]<<16|buff[4]<<8|buff[3]);
+//
+//
+//	int16_t cell_0 = buff[6]|buff[7]<<8;
+//	int16_t cell_1 = buff[8]|buff[9]<<8;
+//	int16_t cell_2 = buff[10]|buff[11]<<8;
+//
+//	printf("\n\r Cell measurements: %.02f %.02f %.02f", C_VOLT_CONV(cell_0), C_VOLT_CONV(cell_1), C_VOLT_CONV(cell_2));
+//	printf("\n\r Current measurements: %.06f %.06f \n\r", curr_1/0.00005, curr_2/0.00005);
+//
+//}
+//
+//void parse_print_gpio_measurement(uint8_t* buff){
+//	int16_t gpio_values[20*TOTAL_IC];
+//	float temp = 0.0;
+//	printf("\n\rGPIO VALUES: \n\r"); // Remove later.
+//	FORIN(x, 10*TOTAL_IC){
+//		gpio_values[x] = buff[2*x]|buff[2*x + 1]<<8; // Not using memcpy because I am not sure about endianness
+//		temp = C_VOLT_CONV(gpio_values[x]);
+//
+//		printf("%.02f  ", temp);
+//		printf("%d  ", gpio_values[x]);
+//		int __x = (x+1)%8? 0 : printf("\n\r"); // Hacky// Prints a new line only every eight values
+//	}
+//
+//}
 
-
-	int16_t cell_0 = buff[6]|buff[7]<<8;
-	int16_t cell_1 = buff[8]|buff[9]<<8;
-	int16_t cell_2 = buff[10]|buff[11]<<8;
-
-	printf("\n\r Cell measurements: %.02f %.02f %.02f", C_VOLT_CONV(cell_0), C_VOLT_CONV(cell_1), C_VOLT_CONV(cell_2));
-	printf("\n\r Current measurements: %.06f %.06f \n\r", curr_1/0.00005, curr_2/0.00005);
-
-}
-
-void parse_print_gpio_measurement(uint8_t* buff){
-	int16_t gpio_values[20*TOTAL_IC];
-	float temp = 0.0;
-	printf("\n\rGPIO VALUES: \n\r"); // Remove later. Only prints in debug mode.
-	FORIN(x, 10*TOTAL_IC){
-		gpio_values[x] = buff[2*x]|buff[2*x + 1]<<8; // Not using memcpy because I am not sure about endianness
-		temp = C_VOLT_CONV(gpio_values[x]);
-
-		printf("%.02f  ", temp);
-		printf("%d  ", gpio_values[x]);
-		int __x = (x+1)%8? 0 : printf("\n\r"); // Hacky// Prints a new line only every eight values
-	}
-
-}
-
-
-void hex_dump(u8 * buff, int nBytes){
-	FORIN(i, nBytes){
-		printf("%02x ", buff[i]);
-		int __x = (i+1)%6? 0 : printf("\n\r"); // Hacky// Prints a new line only every eight values
-	}
-}
+//
+//void hex_dump(u8 * buff, int nBytes){
+//	FORIN(i, nBytes){
+//		printf("%02x ", buff[i]);
+//		int __x = (i+1)%6? 0 : printf("\n\r"); // Hacky// Prints a new line only every eight values
+//	}
+//}
 
 /*
  * Not using itm since it needs debug mode to run and isoSPI needs

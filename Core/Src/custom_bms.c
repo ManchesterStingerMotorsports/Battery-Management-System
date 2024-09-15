@@ -53,24 +53,23 @@ u8 startAux2Measurement[2] = {0x04, 0x00}; //
 
 
 
-// @brief Parses the status register. The return value only contains the number of flags set. This function
-// 		  loses information about which cell set the flag. Since the BMS cannot isolate or cutt off cells,
-// 		  knowing which cell set a flag is not very useful.
+// @brief Parses the status register. The return value only contains the number of flags set.
 // @param argStatReg Pointer to the array containing all measured status registers.
 // @param statRegsize	Number of byte in the array
 // @param errFlagBuff User defined buffer to store positional data of error flags.
 // @param errFlagBUffSize Size of errFlagBuff
 // @return Returns the number of flags set.Returns -1 if buffer sizes are not appropriate.
 int _parseStatusRegister(uint8_t * argStatReg, size_t statRegsize, statErr_t * errFlagBuff, size_t errFlagBuffSize){
-	uint16_t retValHigh = 0;
-	uint16_t retValLow = 0;
+	uint16_t retValHigh = 0; // Undervoltage bits for EACH IC
+	uint16_t retValLow = 0; // Overvoltage bits for EACH IC
 	uint8_t icNum = 0;
 	uint8_t retVal = 0;
 
+	// Check if the size of argStatReg is divisible by 6, and if its exactly 6 times errFlagBuff
 	if((statRegsize%6) || (errFlagBuffSize*6 != statRegsize)) return -1;
 
 	// TODO: Check if ADBMS 2950 has the same position for flags in the status register
-	for(int i = 0; i < size; i ++){ // Iterating through all the registers.
+	for(int i = 0; i < statRegsize; i ++){ // Iterating through all the registers.
 		if(i%4 || i%5){ // Only check every 4th and 5th register.
 			for(int x = 0; x < 4; x ++){
 				uint8_t checkVal = (argStatReg[i]>>(x*2) & 0b11) ; // Magic equation extracts high and low bits for a cell
@@ -89,6 +88,8 @@ int _parseStatusRegister(uint8_t * argStatReg, size_t statRegsize, statErr_t * e
 				default:
 					break;
 				} // End switch statement
+				retValLow <<= 1;
+				retValHigh <<= 1;
 			} // End for loop
 		} // End if statement
 		else if (!(i%6) && !i) { // i is a multiple of 6 and i is not 0
@@ -97,9 +98,7 @@ int _parseStatusRegister(uint8_t * argStatReg, size_t statRegsize, statErr_t * e
 			retValHigh = 0;
 			retValLow = 0;
 		}
-		else{
-			pass;
-		}
+		// Pass otherwise
 	}
 	// I think it should record positional information. That way, we won't need to measure all cells
 	// to see which one set the flag. I'm not sure how I would go about doing tha without using a
@@ -107,6 +106,27 @@ int _parseStatusRegister(uint8_t * argStatReg, size_t statRegsize, statErr_t * e
 	return retVal; // Techincally, this can work for 16^2 cells.
 }
 
+/// @brief Takes raw bytes received from ADBMS ICs and parses them into 16 bit values that represents
+/// 		measured cell voltage values(ADBMS6830) and current value(ADBMS2950)
+
+int _parseCellVoltages(u8 * rawBuff,size_t rawSize, u16 * cellVoltages){
+
+	FORIN(x, 16*(TOTAL_IC-1)){ // This works because 0 indexing // TODO: Check which indexes need to be skipped
+		cellVoltages[x] = rawBuff[2*x]|rawBuff[2*x + 1]<<8; // Not using memcpy because I am not sure about endianness
+	}
+
+	return 0;
+}
+
+int _parseCellTemps(u8 * rawBuff, size_t rawSize, u16 * cellTemps){
+
+	FORIN(x, 10*TOTAL_IC){
+		cellTemps[x] = rawBuff[2*x]|rawBuff[2*x + 1]<<8; // Not using memcpy because I am not sure about endianness
+		}
+	// TODO ; Check with register maps
+
+	return 0;
+}
 
 int configBMS(void){
 	wakeup_chain(TOTAL_IC);
@@ -126,8 +146,8 @@ int configBMS(void){
 		buff_6830_a[0] = (0x01<<7); // Reference powered on
 		buff_6830_a[1] = 0x00; // All flags = 0
 
-		// TODO: Find out what SOAK does
-		buff_6830_a[2] = 0x00; // Control reg for soak functions. Cleared for now. Will set when soak is understood
+
+		buff_6830_a[2] = 0x00; // Control reg for SOAK functions. Cleared for now. Will set when SOAK is understood
 		buff_6830_a[3] = 0xFF; // GPIOs [8:0] are all pulled down.(For ADC measurements)
 		buff_6830_a[4] = 0x03; // GPIOs 10 and 9 are not pulled down.
 		buff_6830_a[5] = (0x01<<3); // bits [2:0] is for filter.
@@ -206,7 +226,8 @@ int configBMS(void){
  * 		 are set.
  *
  */
-int pollCellVoltage(u8* rxdata){
+int pollCellVoltage(u16* argCellValues){
+	u8 rxdata[REG_SIZE_BYTES];
 	int retval = 0;
 	u8 _dumpbyte = 0;
 	uint32_t pecerr = 0;
@@ -229,43 +250,47 @@ int pollCellVoltage(u8* rxdata){
 	FORIN(__j, 1){
 	// The pointer arithmetic needs to change based on the number of ICs
 	spiReadData(TOTAL_IC, RDCVA, rxdata, &pecerr, cmd_cnt, RX_SIZE);
-	spiReadData(TOTAL_IC, RDCVB, rxdata + (6*TOTAL_IC), &pecerr, cmd_cnt, RX_SIZE); // Pointer maths might be wrong
+	spiReadData(TOTAL_IC, RDCVB, rxdata + (6*TOTAL_IC), &pecerr, cmd_cnt, RX_SIZE); // TODO: Formatting is wrong
 	spiReadData(TOTAL_IC, RDCVC, rxdata + (12*TOTAL_IC), &pecerr, cmd_cnt, RX_SIZE);
 	spiReadData(TOTAL_IC, RDCVD, rxdata + (18*TOTAL_IC), &pecerr, cmd_cnt, RX_SIZE);
 	spiReadData(TOTAL_IC, RDCVE, rxdata + (24*TOTAL_IC), &pecerr, cmd_cnt, RX_SIZE);
 	spiReadData(TOTAL_IC, RDCVF, rxdata + (30*TOTAL_IC), &pecerr, cmd_cnt, RX_SIZE);
 	retval = pecerr;
 	}
+
+
+	_parseCellVoltages(rxdata, REG_SIZE_BYTES, argCellValues);
 	return retval;
 }
 
 
-int pollAuxVoltage(u8* rxdata){
+int pollAuxVoltage(u16* argCellTemps){
 	int retval = 0;
 	u8 _dumpbyte = 0;
 	uint32_t pecerr = 0;
 	u8 cmd_cnt[TOTAL_IC];
+	u8 rxdata[REG_SIZE_BYTES];
 
 
-	spiSendCmd(startAux2Measurement); // This should work :)
+	spiSendCmd(startAux2Measurement); // Requesting twice works more reliably
 	spiCSHigh();
 	spiSendCmd(startAux2Measurement);
 	spiCSHigh(); // spiSendCmd pulls CS low before sending. It doesn't pull it back up high so we don't use another function for polling
 	spiSendCmd(PLAUX2);
 	while(_dumpbyte != 0xFF){
 		spi_read(&_dumpbyte, 1);
-		printf("Polling\n\r");
 	}
 	spiCSHigh();
 
 	// No read aux2 all command unfort
-	spiReadData(TOTAL_IC, RDRAXA, rxdata, &pecerr, cmd_cnt,  ONE_REG_SIZE);
-	spiReadData(TOTAL_IC, RDRAXB, rxdata + 6, &pecerr, cmd_cnt,  ONE_REG_SIZE);
-	spiReadData(TOTAL_IC, RDRAXC, rxdata + 12, &pecerr, cmd_cnt,  ONE_REG_SIZE);
-	spiReadData(TOTAL_IC, RDRAXD, rxdata + 18, &pecerr, cmd_cnt,  ONE_REG_SIZE);
+	spiReadData(TOTAL_IC, RDRAXA, rxdata, &pecerr, cmd_cnt,  ONE_REG_SIZE); // TODO: Formatting is messed up
+	spiReadData(TOTAL_IC, RDRAXB, rxdata + (6*TOTAL_IC), &pecerr, cmd_cnt,  ONE_REG_SIZE);
+	spiReadData(TOTAL_IC, RDRAXC, rxdata + (12*TOTAL_IC), &pecerr, cmd_cnt,  ONE_REG_SIZE);
+	spiReadData(TOTAL_IC, RDRAXD, rxdata + (18*TOTAL_IC), &pecerr, cmd_cnt,  ONE_REG_SIZE);
 	if(pecerr > 0){
 		retval = pecerr;
 	}
+	_parseCellTemps(rxdata, REG_SIZE_BYTES, argCellTemps); // TODO Fix parsing to match formatting
 	return retval;
 }
 
@@ -331,22 +356,33 @@ int readSID(void){
 /// @brief Read status registers to check if any edge cases exist.
 /// @param readBuffer Pointer to array where you want all the status registers to be stored.
 ///		   Must be equal to 6*Number of ADBMS ICs.
+/// @param size
+/// @param errFlagBuff
+/// @param errFlagBuffSize
 /// @return 2 if communication fails, 1 if errors exist, 0 if no errors
 int readStatErr(u8 * readBuffer, size_t size, statErr_t * errFlagBuff, size_t errBuffSize){
 
 	uint32_t pecerr = 0;
 	u8 cmd_cnt[size/6]; // I want to get rid of this eventually.
-
-	spiReadData(TOTAL_IC, RDSTATD, statBuffer, &pecerr, cmd_cnt,  RX_SIZE);
+	uint32_t flagCount;
+	spiReadData(TOTAL_IC, RDSTATD, readBuffer, &pecerr, cmd_cnt,  RX_SIZE);
 
 //	printf("\n\rSTATERR: ");
 	if(0 != pecerr){ // Communication failed. This should just retrigger communcation.
 		uint8_t tryCount = 1; // lol
 		while(pecerr && (tryCount < 10)){ // TODO: Make this configuratble later.
-			spiReadData(TOTAL_IC, RDSTATD, statBuffer, &pecerr, cmd_cnt,  RX_SIZE);
+			spiReadData(TOTAL_IC, RDSTATD, readBuffer, &pecerr, cmd_cnt,  RX_SIZE);
 		}
 	}
-	if(_parseStatusRegister(readBuffer, size, errFlagBuff, errBuffSize))return 1; // Some flags are set.
+
+	flagCount = _parseStatusRegister(readBuffer, size, errFlagBuff, errBuffSize); // Some flags are set.
+
+	if((flagCount >> 16) & 0xFFFF){ // 16-bit mask
+		return 0b10;
+	}
+	else if(flagCount & 0xFFFF){
+		return 0b01;
+	}
 
 	return 0;
 }

@@ -21,7 +21,7 @@
 
 enum fs_bms_error_t{
 	NO_ERROR = 0,
-	CELL_UV = 1, //cell nudervoltage
+	CELL_UV = 1, //cell undervoltage
 	CELL_OV, //Cell overvoltage
 	PACK_OC,// pack over current
 	HIGH_TEMP, // high temperature
@@ -29,16 +29,16 @@ enum fs_bms_error_t{
 
 //TODO: List more components of the bms
 enum fs_bms_component_t{
-	NONE = 0,
+	NO_COMP = 0,
 	CELL_V = 1,
 	PACK_CURR = 2,
-	TEMP  = 3,
+	TEMPERATURE  = 3,
 };
 
 
 /*---------------------------STRUCTS--------------------------------------*/
 typedef struct _error_message{
-	int error_val;
+	int error_val; // Largely unused right now.
 	enum fs_bms_error_t error_type;
 }fs_bms_error_msg;
 
@@ -48,6 +48,8 @@ typedef struct _error_message{
 int init_error_handler(void);
 
 void bms_error_handler_task(void*);
+
+osStatus_t post_error_message(fs_bms_error_msg * );
 
 void set_error(enum fs_bms_error_t);
 

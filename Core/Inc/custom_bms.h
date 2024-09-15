@@ -16,15 +16,15 @@
 
 int configBMS(void);
 
-int pollCellVoltage(u8*);
+int pollCellVoltage(u16*);
 
-int pollAuxVoltage(u8*);
+int pollAuxVoltage(u16*);
 
 int readCFG(void);
 
 int readSID(void);
 
-int readStatErr(void);
+int readStatErr(u8 * readBuffer, size_t size, statErr_t * errFlagBuff, size_t errBuffSize);
 
 
 

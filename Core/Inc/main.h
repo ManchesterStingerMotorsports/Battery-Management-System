@@ -33,6 +33,9 @@ extern "C" {
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #define TOTAL_IC 			2
+#define REG_SIZE_BYTES		TOTAL_IC*6
+#define nCELLS				TOTAL_IC*16
+#define nTEMPS				TOTAL_IC*10
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
