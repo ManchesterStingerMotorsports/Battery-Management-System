@@ -48,6 +48,7 @@ extern osMessageQueueId_t oBMSErrorMsgQueue;
 extern osMessageQueueId_t oBMSCANMsgQueue;
 
 
+
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/

@@ -24,6 +24,8 @@ typedef enum _candatatype{
 
 }canReqType;
 
+extern osThreadId_t canReqHandlerId;
+
 /*------------------ENUMS-------------------*/
 /*-----------------STRUCTS------------------*/
 /*-----------FUNCITON PROTOTYPES------------*/

@@ -22,6 +22,7 @@ volatile int canSendFlag =0;
 osEventFlagsId_t canReqEventId;
 
 
+
 osThreadId_t canReqHandlerId;
 osThreadAttr_t canReqHandlerAttr ={
 		.name = "CAN Handler",
