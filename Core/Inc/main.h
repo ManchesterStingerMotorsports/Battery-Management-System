@@ -28,10 +28,11 @@ extern "C" {
 
 /* Includes ------------------------------------------------------------------*/
 #include "stm32f4xx_hal.h"
-#include "cmsis_os.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "cmsis_os.h"
+
 #define TOTAL_IC 			2
 #define REG_SIZE_BYTES		TOTAL_IC*6
 #define nCELLS				TOTAL_IC*16
@@ -43,10 +44,12 @@ extern "C" {
 extern TIM_HandleTypeDef htim2;
 extern SPI_HandleTypeDef hspi1;
 
+extern UART_HandleTypeDef huart3;
+extern CAN_HandleTypeDef hcan1;
+
 extern osMutexId_t oCANMutex;
 extern osMessageQueueId_t oBMSErrorMsgQueue;
 extern osMessageQueueId_t oBMSCANMsgQueue;
-
 
 
 /* USER CODE END ET */

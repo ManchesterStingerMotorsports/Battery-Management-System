@@ -79,6 +79,9 @@ void bms_error_handler_task(void*){
 				osDelay(1000); // If errors exist, they only get transmitted once every second
 			}
 		}
+
+		osDelay(100); // yield for other task to run
+
 	} // While loop end
 
 }
